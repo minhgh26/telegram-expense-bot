@@ -21,7 +21,7 @@ deploy có thể còn mang `targetMonth` theo quy tắc cũ. **Bỏ qua trườn
 
 **Blocked by:** —
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] Tháng ghi = tháng của ngày khoản, với mọi nguồn và không nguồn
 - [x] Bỏ `src/billing.ts`, `tests/billing.test.ts`, `cutoffDayFor`, `defaultCutoffDay(s)`
@@ -38,7 +38,7 @@ deploy có thể còn mang `targetMonth` theo quy tắc cũ. **Bỏ qua trườn
 - [x] Script `setup-note`, `check-note`, `verify-card` gỡ phần mốc chốt (xoá script chỉ để kiểm mốc chốt, kèm mục `package.json`)
 - [x] `README.md` mục "Nguồn trả sau" viết lại theo spec, thêm câu "không ghi khoản trả nợ thẻ"
 - [x] `npm test` và `npm run typecheck` qua
-- [ ] Nghiệm thu: deploy lên bot thật; người dùng gửi một khoản có `hsbc` mang ngày sau ngày 7 của tháng này, mở Excel thấy nó ở sheet tháng này; tin xác nhận ra `💳 Thẻ HSBC`
+- [x] Nghiệm thu: deploy lên bot thật; người dùng gửi một khoản có `hsbc` mang ngày sau ngày 7 của tháng này, mở Excel thấy nó ở sheet tháng này; tin xác nhận ra `💳 Thẻ HSBC`
 
 ## Comments
 
@@ -73,3 +73,9 @@ Commit trên `feat/tieu-thang-nao-ghi-thang-do` (chưa push): `d9eb7ff`, `12b43c
 - Xác nhận các mặc định: xoá `verify-card.mjs` nhưng chuyển hai kiểm tra sang `smoke.mjs`; giữ câu về `cc` trong README.
 - Nên deploy ticket này sát lúc chạy ticket 03, để khoảng `/today` thiếu khoản nói ở trên ngắn nhất.
 - **Needs triage:** cho `/today` và dòng "Hôm nay" dùng chung một quy tắc cộng (có cần mô tả hay không). Chưa lập ticket.
+
+### 2026-11-14 — nghiệm thu
+
+Đã deploy lên Worker thật (version `5becf57a-7476-4eb6-a7d1-9ceace0601c4`). Người dùng báo kiểm tay đạt: khoản `hsbc` mang ngày sau ngày 7 tháng này nằm ở sheet tháng này, tin xác nhận ra `💳 Thẻ HSBC`. Đóng ticket.
+
+Các mục còn mở ở phần **For the maintainer** phía trên (chạy `scripts/smoke.mjs`, xác nhận mặc định, Needs triage về `/today`) vẫn giữ nguyên.
