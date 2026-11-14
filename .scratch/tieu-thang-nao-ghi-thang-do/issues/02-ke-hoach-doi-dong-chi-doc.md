@@ -72,5 +72,32 @@ Commit trên `feat/tieu-thang-nao-ghi-thang-do` (chưa push): `43b88cd`, `16a7cc
 
 **For the maintainer**
 - Nghiệm thu: `npm run spike:prepare` để tạo bản TEST mới, trỏ `.dev.vars` vào nó, chạy `node scripts/realign-months.mjs`, đọc bản in (nhất là các dòng ★ "gắn [hsbc] — dòng cũ không tiền tố"). Xong thì gửi `/reauth` trong Telegram, tick tiêu chí cuối và đóng ticket.
-- Quyết định: dòng `[cc]` có ô ngày là chữ hiện được giữ nguyên `[cc]` (spec: "Ô ngày không phải số … → không đụng"). Điều này vướng user story 10 ("mọi dòng `[cc]` thành `[hsbc]`") và tiêu chí ticket 03 "không còn dòng `[cc]` nào". Chọn một: (a) vẫn đổi `[cc]` → `[hsbc]` tại chỗ cho dòng này, không dời; (b) giữ như hiện tại và nới tiêu chí ticket 03. Đề xuất (a).
+- ~~Quyết định: dòng `[cc]` có ô ngày là chữ hiện được giữ nguyên `[cc]` (spec: "Ô ngày không phải số … → không đụng"). Điều này vướng user story 10 ("mọi dòng `[cc]` thành `[hsbc]`") và tiêu chí ticket 03 "không còn dòng `[cc]` nào". Chọn một: (a) vẫn đổi `[cc]` → `[hsbc]` tại chỗ cho dòng này, không dời; (b) giữ như hiện tại và nới tiêu chí ticket 03. Đề xuất (a).~~ Không cần quyết: file thật không có dòng nào như vậy (xem mục quét ngày 2026-11-14 bên dưới).
 - Xác nhận các mặc định: dòng năm khác nằm ở "Ở yên" và đếm một lần; script từ chối mọi tham số cho tới ticket 03; export `DEFERRED_ALLOWED` trong `src/parse/message.ts`.
+
+### 2026-11-14 — quét file thật tìm dòng `[cc]` không có ngày
+
+Quét chỉ đọc file thật `Theo dõi chi tiêu.xlsx` (`DRIVE_ITEM_ID`), đủ 108 bảng, không bảng nào thiếu. Script quét để ở thư mục tạm, không nằm trong repo.
+
+- 1.181 dòng có dữ liệu (dòng trống = cả 3 ô mô tả, ngày, số tiền đều trống).
+- Dòng có mô tả bắt đầu bằng `[cc] `: **0**. Biến thể gần giống (`[CC]`, `[cc]` thiếu dấu cách, có khoảng trắng đầu): 0.
+- Vì vậy quyết định "dòng `[cc]` có ô ngày là chữ" không cần chốt cho file này: (a) hay (b) cho cùng kết quả. Trên file thật, bước đổi `[cc]` → `[hsbc]` của ticket 03 cũng không có dòng nào để đổi.
+- 13 dòng có nội dung nhưng ô ngày trống (không dòng nào là `[cc]`). Bản in ticket 02 sẽ xếp chúng vào "Ở yên" với `(không có ngày)`:
+
+| Bảng | Mô tả | Số tiền |
+|---|---|---|
+| other_expense_2 | biếu ông bà cô bác ngày Tết | 2.600.000 |
+| other_expense_3 | thanh toán bằng zalopay | 1.145.000 |
+| other_expense_4 | thanh toán bằng zalopay | 4.086.000 |
+| income_5 | lương CMC | 12.594.867 |
+| income_5 | lương FPT | 13.571.536 |
+| income_6 | Điều chỉnh số dư | -846.593 |
+| income_10 | hoàn tiền mua sắm | 53.966 |
+| invest_5 | CCQ | 3.000.000 |
+| saving_1 | zalopay | 5.000.000 |
+| saving_2 | zalopay | 7.785.494 |
+| saving_4 | *(mô tả trống)* | 17.454 |
+| saving_4 | zalopay | *(tiền trống)* |
+| saving_5 | zalopay | 14.183.548 |
+
+Lần quét này đã xoay refresh token, nên bot cần `/reauth`.
