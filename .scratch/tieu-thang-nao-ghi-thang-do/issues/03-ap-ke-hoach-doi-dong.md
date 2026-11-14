@@ -27,10 +27,10 @@ Chi tiết ở `../spec.md` mục "Công cụ dời dòng" và "Thứ tự tri�
 - [x] Đổi mô tả tại chỗ có kiểm nội dung trước khi `PATCH`
 - [x] Dọn mỗi bảng đã nhận dòng (sắp theo ngày + thêm dòng trống nếu đáy chưa có), không xoá dòng
 - [x] Báo cáo cuối: số dòng đã dời / đổi mô tả / ở yên / có thể trùng, kèm danh sách; mã thoát ≠ 0 nếu có "có thể trùng" hoặc lỗi
-- [ ] Chạy lại `realign-months.mjs` (chỉ đọc) ngay sau `--apply` → mục dời và mục đổi `[cc]` rỗng
-- [ ] `node scripts/audit-real.mjs` không báo công thức `Tóm tắt` hỏng
-- [ ] Nghiệm thu bản TEST: người dùng mở bản TEST, đối chiếu vài dòng trong bản in của ticket 02 đã nằm đúng chỗ, không còn `[cc]`
-- [ ] Người dùng đồng ý → `--apply` trên file thật (người dùng không ghi khoản trong lúc chạy)
+- [x] Chạy lại `realign-months.mjs` (chỉ đọc) ngay sau `--apply` → mục dời và mục đổi `[cc]` rỗng
+- [x] `node scripts/audit-real.mjs` không báo công thức `Tóm tắt` hỏng
+- [x] Nghiệm thu bản TEST: người dùng mở bản TEST, đối chiếu vài dòng trong bản in của ticket 02 đã nằm đúng chỗ, không còn `[cc]`
+- [x] Người dùng đồng ý → `--apply` trên file thật (người dùng không ghi khoản trong lúc chạy)
 - [ ] Người dùng gửi `/reauth`; gửi một khoản thử và `/undo` để chắc bot ghi lại bình thường
 
 ## Comments
@@ -101,3 +101,23 @@ Bản sửa không bao giờ gửi lại hai lệnh đó, và đọc lại đún
 - **Needs triage** (chưa tạo ticket): cho script từ chối chạy khi outbox của bot còn khoản xếp hàng. Lý do: trong khoảng
   1 giờ sau khi script xoay token, bot vẫn có thể ghi và sắp bảng giữa chừng. Có làm không, hay chỉ cần dặn
   "kiểm outbox rỗng trước khi chạy"?
+
+### 2026-11-14 — chạy `--apply` trên bản TEST mới tạo
+
+- Bản TEST tạo lại từ file thật (`spike:cleanup` rồi `spike:prepare`). `DRIVE_ITEM_ID` trỏ tạm vào TEST, chạy xong đã trả về file thật.
+- Bản in trước khi chạy: dời 115 (★ 9) · đổi mô tả tại chỗ 0 · ở yên 13.
+- `--apply`: đã dời 114 · đổi mô tả tại chỗ 0 · ở yên 13 · chưa đổi mô tả 0 · có thể trùng 1 · lỗi 0. Mã thoát 1, đúng vì có "có thể trùng".
+- Dòng "có thể trùng" là `[hsbc] bạc xỉu M CK · 27/08 · 20.000`. Đã thêm vào `other_8`, nhưng lệnh xoá ở `other_9` bị Graph trả 500 `GenericFileOpenError`. Script không gửi lại lệnh xoá, nên không xoá nhầm dòng nào.
+- Đọc lại thấy dòng này nằm ở cả `other_8` (index 42) và `other_9` (index 0): Graph thực sự **chưa** xoá.
+- Chạy lại chế độ chỉ đọc: mục dời còn đúng 1 dòng (chính dòng trên), mục `[cc]` rỗng.
+- `audit-real.mjs` (trên TEST): công thức `Tóm tắt` đúng, không có dòng rác.
+- Người dùng đã xoá tay bản thừa ở `other_9`. Chạy lại chế độ chỉ đọc trên TEST: dời 0 · đổi mô tả tại chỗ 0 · ở yên 13. Tick tiêu chí 6 và 7 theo bản TEST; sẽ chạy lại cả hai sau lần chạy trên file thật.
+
+### 2026-11-14 — chạy `--apply` trên file thật
+
+- Người dùng xác nhận bản TEST ổn (tiêu chí 8), đã `/reauth`, rồi đồng ý chạy trên file thật.
+- Bản in chỉ đọc trên `Theo dõi chi tiêu.xlsx` trước khi chạy giống hệt bản in của TEST: dời 115 (★ 9) · ở yên 13.
+- `--apply`: đã dời 115 · đổi mô tả tại chỗ 0 · ở yên 13 · chưa đổi mô tả 0 · có thể trùng 0 · lỗi 0. Mã thoát 0. Dọn 25 bảng.
+- Chạy lại chế độ chỉ đọc: dời 0 · đổi mô tả tại chỗ 0 · ở yên 13. `audit-real.mjs`: công thức `Tóm tắt` đúng, không có dòng rác. Tiêu chí 6 và 7 đạt cả trên file thật.
+- Còn tiêu chí 10: người dùng gửi `/reauth` (script lại xoay token), gửi một khoản thử rồi `/undo`.
+- Bản TEST (`Theo dõi chi tiêu - TEST.xlsx`) vẫn còn trên OneDrive; xoá bằng `npm run spike:cleanup` khi không cần nữa.
