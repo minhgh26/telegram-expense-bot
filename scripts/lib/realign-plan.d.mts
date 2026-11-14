@@ -11,5 +11,7 @@ export interface PlanChange {
   reason: 'off-month' | 'cc' | 'other-year' | 'no-date';
   starred: boolean;
   kind: 'move' | 'retag' | 'stay';
+  /** Ô mô tả của newValue khác oldValue. */
+  descChanged: boolean;
 }
 export function planSheet(group: string, sheetMonth: number, rows: unknown[][]): PlanChange[];

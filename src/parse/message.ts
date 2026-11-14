@@ -52,7 +52,7 @@ const MULTIWORD: [RegExp, string][] = [
 ];
 
 /** Thu nhập, đầu tư, tiết kiệm không đến từ nguồn trả sau. */
-const DEFERRED_ALLOWED = new Set<CategoryKey>([
+export const DEFERRED_ALLOWED = new Set<CategoryKey>([
   'food', 'eat_out', 'transport', 'force', 'other', 'other_expense',
 ]);
 
