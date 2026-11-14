@@ -25,14 +25,52 @@ Quy tắc phân loại ở `../spec.md` mục "Công cụ dời dòng".
 
 **Status:** ready-for-agent
 
-- [ ] `scripts/lib/realign-plan.mjs`: hàm thuần nhận (nhóm, tháng của sheet, các dòng) → danh sách thay đổi kèm chỉ số, giá trị cũ, giá trị mới, bảng đích, lý do, cờ ★
-- [ ] Không import gì từ `src/`; hằng `WORKBOOK_YEAR`, 9 nhóm, 6 nhóm chi tiêu, bốn tiền tố khai báo lại trong file kèm comment trỏ về `src/config.ts`
-- [ ] Quy đổi serial Excel → ngày/tháng/năm đúng (cùng mốc với `toExcelSerial`)
-- [ ] `tests/realign-plan.test.ts` phủ đủ các ca ở `../spec.md` mục Testing
-- [ ] `scripts/realign-months.mjs` mặc định chỉ đọc, in đúng bốn mục như trên, dòng đầu là tên file đích
-- [ ] Bảng không tồn tại → bỏ qua, báo trong bản in
-- [ ] In nhắc gửi `/reauth` ở cuối
-- [ ] `npm test` và `npm run typecheck` qua
+- [x] `scripts/lib/realign-plan.mjs`: hàm thuần nhận (nhóm, tháng của sheet, các dòng) → danh sách thay đổi kèm chỉ số, giá trị cũ, giá trị mới, bảng đích, lý do, cờ ★
+- [x] Không import gì từ `src/`; hằng `WORKBOOK_YEAR`, 9 nhóm, 6 nhóm chi tiêu, bốn tiền tố khai báo lại trong file kèm comment trỏ về `src/config.ts`
+- [x] Quy đổi serial Excel → ngày/tháng/năm đúng (cùng mốc với `toExcelSerial`)
+- [x] `tests/realign-plan.test.ts` phủ đủ các ca ở `../spec.md` mục Testing
+- [x] `scripts/realign-months.mjs` mặc định chỉ đọc, in đúng bốn mục như trên, dòng đầu là tên file đích
+- [x] Bảng không tồn tại → bỏ qua, báo trong bản in
+- [x] In nhắc gửi `/reauth` ở cuối
+- [x] `npm test` và `npm run typecheck` qua
 - [ ] Nghiệm thu: chạy trên bản TEST mới tạo, người dùng đọc bản in và xác nhận danh sách hợp lý (đặc biệt các dòng ★)
 
 ## Comments
+
+### 2026-11-14 — /mrs:deliver
+
+Commit trên `feat/tieu-thang-nao-ghi-thang-do` (chưa push): `43b88cd`, `16a7cc9`; mốc so sánh `564d813`. Gate: agent báo `npm test` 298/298 (không test nào bị bỏ qua), `npm run typecheck` sạch; agent review chạy lại độc lập trên `43b88cd` cũng thấy xanh.
+
+**Quyết định ticket không quy định**
+- Dòng mang ngày năm khác (trước hoặc sau `WORKBOOK_YEAR`) luôn nằm ở mục "Ở yên", kể cả khi mô tả được đổi `[cc]` → `[hsbc]` hoặc gắn `[hsbc]` ★ tại chỗ; ghi chú cuối dòng cho biết việc đổi.
+- Mục "Tổng": mỗi dòng đếm đúng một lần, ở mục nó được liệt kê. "đổi mô tả tại chỗ" = số dòng trong mục "Đổi [cc] → [hsbc] tại chỗ"; dòng năm khác có đổi mô tả chỉ đếm ở "ở yên".
+- Dòng có ô ngày không phải số nhưng có nội dung → "Ở yên", in `(không có ngày)`. Dòng trống tính theo 3 ô mô tả/ngày/số tiền (như CONTEXT.md), ô thừa phía sau không tính.
+- Mô tả là số (Excel lưu `100` thành số) được đổi thành chuỗi: `[hsbc] 100`.
+- Ngày in `dd/mm` cho năm `WORKBOOK_YEAR`, `dd/mm/yyyy` cho năm khác.
+- Thêm mục thứ năm "=== Bảng không tồn tại (N, bỏ qua) ===", chỉ in khi có bảng thiếu (bảng trả về 404).
+- Script từ chối mọi tham số dòng lệnh (kể cả `--apply`) và thoát trước khi lấy token, nên chạy nhầm `--apply` không làm chết refresh token và không in kết quả giả là "đã dời".
+- Dòng "(da luu refresh token moi vao .dev.vars)" của `getAccessToken` được giữ lại và in ở cuối, ngay trước lời nhắc `/reauth`, để "File đích: …" là dòng đầu. `getAccessToken` không đổi.
+- Lời nhắc `/reauth` in ở mọi lối ra sau khi đã lấy token, kể cả khi đọc file hoặc bảng lỗi (khi đó mã thoát là 1).
+- Mỗi mục kế hoạch có thêm cờ `descChanged` (mô tả có đổi không) bên cạnh `kind`, để ticket 03 khỏi phải so giá trị cũ/mới.
+- `src/parse/message.ts`: thêm `export` cho `DEFERRED_ALLOWED`, để test kiểm 6 nhóm chi tiêu khai báo lại khớp với bot. Test mới `hằng khai báo lại khớp src/` cũng kiểm `WORKBOOK_YEAR`, 9 nhóm, 4 tiền tố. `scripts/lib/realign-plan.mjs` vẫn không import gì từ `src/`.
+- Thêm `scripts/lib/realign-plan.d.mts` (khai báo kiểu) để test TypeScript import được file `.mjs` khi typecheck chặt.
+- Không sửa ADR, CONTEXT.md, README. Không thêm thuật ngữ mới.
+
+**Giới hạn đã biết**
+- `scripts/realign-months.mjs` chưa từng chạy với Graph. Theo agent báo, nó chỉ được kiểm bằng `node --check` và một lần chạy với `--apply` (bị từ chối, thoát 1 như mong muốn). Thứ tự dòng in, bản in mới và lời nhắc ở lối ra lỗi chỉ đọc từ code. Bước nghiệm thu là chỗ bắt các lỗi này.
+- Bảng thiếu chỉ được nhận ra khi Graph trả về 404; mọi lỗi khác dừng cả lượt chạy.
+- Nếu chính `getAccessToken` ném lỗi thì không có lời nhắc `/reauth`.
+- Chỉ số dòng là vị trí trong mảng Graph trả về (không phân trang). Ticket 03 đọc lại dòng trước khi xoá, nên lệch sẽ bị chặn ở đó.
+- `oldValue`, và `newValue` khi không đổi, là chính mảng dòng đầu vào: ticket 03 không được sửa trực tiếp vào chúng.
+
+**Review: để nguyên có chủ ý**
+- Code chia nhánh theo `kind`/`reason` bằng ternary lồng nhau. Tên bảng `${group}_${month}` dựng ở hai file. Điều kiện `date.m !== sheetMonth` tính lại.
+- Hằng xuất ra nhưng chỉ test dùng. Kiểu union `reason`/`kind` ghi ở cả JSDoc lẫn `.d.mts`. Tên nhóm là `string` thay vì union.
+- Tên ngắn trong test/script (`one`, `dong(mo…)`, `c`, `v`). Thông báo lỗi không dấu (theo kiểu `dev-vars.mjs`). `$select=index` lấy về rồi bỏ.
+
+**Tiêu chí chưa đạt:** "Nghiệm thu" — cần chạy trên bản TEST mới tạo và người dùng xác nhận.
+
+**For the maintainer**
+- Nghiệm thu: `npm run spike:prepare` để tạo bản TEST mới, trỏ `.dev.vars` vào nó, chạy `node scripts/realign-months.mjs`, đọc bản in (nhất là các dòng ★ "gắn [hsbc] — dòng cũ không tiền tố"). Xong thì gửi `/reauth` trong Telegram, tick tiêu chí cuối và đóng ticket.
+- Quyết định: dòng `[cc]` có ô ngày là chữ hiện được giữ nguyên `[cc]` (spec: "Ô ngày không phải số … → không đụng"). Điều này vướng user story 10 ("mọi dòng `[cc]` thành `[hsbc]`") và tiêu chí ticket 03 "không còn dòng `[cc]` nào". Chọn một: (a) vẫn đổi `[cc]` → `[hsbc]` tại chỗ cho dòng này, không dời; (b) giữ như hiện tại và nới tiêu chí ticket 03. Đề xuất (a).
+- Xác nhận các mặc định: dòng năm khác nằm ở "Ở yên" và đếm một lần; script từ chối mọi tham số cho tới ticket 03; export `DEFERRED_ALLOWED` trong `src/parse/message.ts`.
