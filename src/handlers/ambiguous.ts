@@ -12,11 +12,11 @@ import { performWrite, type ExactEntry } from './write';
  */
 export async function askAmount(
   env: Env, chatId: number, entry: ParsedEntry,
-  targetMonth: number, low: number, high: number,
+  low: number, high: number,
 ): Promise<void> {
   const id = crypto.randomUUID().slice(0, 8);
   await putPending(env.DB, {
-    id, chatId, payloadJson: JSON.stringify({ ...entry, targetMonth, low, high }),
+    id, chatId, payloadJson: JSON.stringify({ ...entry, low, high }),
   });
 
   await sendMessage(
@@ -44,13 +44,12 @@ export async function resolveAmount(
   }
 
   const p = JSON.parse(pending.payloadJson) as Omit<ParsedEntry, 'source'> & {
-    low: number; high: number; targetMonth: number;
+    low: number; high: number;
     source?: DeferredSource | null; isCard?: boolean;
   };
   const exact: ExactEntry = {
     category: p.category, description: p.description, date: p.date,
     source: legacySource(p),
-    targetMonth: p.targetMonth,
     amount: which === 'hi' ? p.high : p.low,
   };
 

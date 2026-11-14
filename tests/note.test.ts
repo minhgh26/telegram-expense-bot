@@ -13,22 +13,8 @@ const usedRangeShape = {
   ],
 };
 
-/** Khối H–I trong cùng vùng lệch E4: H là cột chỉ số 3 của mảng (E,F,G,H,...). */
-const usedRangeWithCutoffs = {
-  address: 'Note!E4:K12',
-  values: [
-    ['WM', 'Winmart', '', 'hsbc', 24, '', ''],
-    ['TC', 'TocoToco', '', 'spl', 20, '', ''],
-    ['MT', 'Mầm Trà', '', 'zlp', 15, '', ''],
-  ],
-};
-
 /** Vùng cố định A1:K6 — cái mà loadNote thật sự đọc. Cột A..K = chỉ số 0..10. */
 const fixedRange = (rows: unknown[][]) => ({ address: 'Note!A1:K6', values: rows });
-
-/** Một dòng của khối H–I trong vùng cố định: token ở H (chỉ số 7), mốc ở I (chỉ số 8). */
-const hi = (token: unknown, cutoff: unknown): unknown[] =>
-  ['', '', '', '', '', '', '', token, cutoff, '', ''];
 
 describe('bảng mã viết tắt', () => {
   it('HỒI QUY: vùng bắt đầu từ E4 vẫn đọc được mã — lỗi này đã lên production', () => {
@@ -57,53 +43,9 @@ describe('bảng mã viết tắt', () => {
     }).shortcodes).toEqual({}));
 });
 
-describe('mốc chốt sao kê — khối H (token) / I (ngày chốt)', () => {
-  it('đọc đúng mốc của mọi nguồn', () =>
-    expect(parseNote(fixedRange([hi('hsbc', 20), hi('spl', 22), hi('zlp', 15)])).cutoffDays)
-      .toEqual({ hsbc: 20, vpb: 26, spl: 22, zlp: 15 }));
-
-  it('HỒI QUY: vùng usedRange lệch kiểu Note!E4:K12 vẫn đọc đúng khối H–I', () =>
-    expect(parseNote(usedRangeWithCutoffs).cutoffDays).toEqual({ hsbc: 24, vpb: 26, spl: 20, zlp: 15 }));
-
-  it('đọc mốc của vpb', () =>
-    expect(parseNote(fixedRange([hi('vpb', 25)])).cutoffDays.vpb).toBe(25));
-
-  it('dòng cc cũ còn sót trong khối bị bỏ qua — hsbc dùng mặc định', () =>
-    expect(parseNote(fixedRange([hi('cc', 20)])).cutoffDays.hsbc).toBe(7));
-
-  it('chuỗi số cũng nhận', () =>
-    expect(parseNote(fixedRange([hi('hsbc', '20')])).cutoffDays.hsbc).toBe(20));
-
-  it('token viết hoa hoặc có khoảng trắng vẫn nhận diện được', () =>
-    expect(parseNote(fixedRange([hi(' HSBC ', 20)])).cutoffDays.hsbc).toBe(20));
-
-  it('token lạ ở cột H bị bỏ qua, không làm hỏng gì', () =>
-    expect(parseNote(fixedRange([hi('xyz', 20)])).cutoffDays)
-      .toEqual({ hsbc: 7, vpb: 26, spl: 24, zlp: 28 }));
-
-  it('giá trị rỗng → mặc định của đúng nguồn đó', () =>
-    expect(parseNote(fixedRange([hi('spl', '')])).cutoffDays.spl).toBe(24));
-
-  it('không phải số nguyên → mặc định của đúng nguồn đó', () =>
-    expect(parseNote(fixedRange([hi('zlp', 'hai mươi')])).cutoffDays.zlp).toBe(28));
-
-  it('số lẻ → mặc định của đúng nguồn đó', () =>
-    expect(parseNote(fixedRange([hi('hsbc', 7.5)])).cutoffDays.hsbc).toBe(7));
-
-  it('0 nằm ngoài khoảng 1–28 → mặc định của đúng nguồn đó', () =>
-    expect(parseNote(fixedRange([hi('hsbc', 0)])).cutoffDays.hsbc).toBe(7));
-
-  it('29 nằm ngoài khoảng vì không phải tháng nào cũng có → mặc định của nguồn đó', () =>
-    expect(parseNote(fixedRange([hi('spl', 29)])).cutoffDays.spl).toBe(24));
-
-  it('nguồn thiếu hẳn khỏi khối → dùng mặc định của nguồn đó', () =>
-    expect(parseNote(fixedRange([hi('hsbc', 20)])).cutoffDays)
-      .toEqual({ hsbc: 20, vpb: 26, spl: 24, zlp: 28 }));
-
-  it('khối trống hoàn toàn → mọi nguồn dùng mặc định của chính nó', () =>
-    expect(parseNote(fixedRange([])).cutoffDays).toEqual({ hsbc: 7, vpb: 26, spl: 24, zlp: 28 }));
-
-  it('mảng rỗng → mọi nguồn dùng mặc định', () =>
-    expect(parseNote({ address: 'Note!A1:K6', values: [] }).cutoffDays)
-      .toEqual({ hsbc: 7, vpb: 26, spl: 24, zlp: 28 }));
+describe('khối H–I (ngày chốt cũ) không còn được đọc', () => {
+  it('NoteConfig chỉ còn bảng mã viết tắt', () =>
+    expect(Object.keys(parseNote(fixedRange([
+      ['', '', '', '', 'WM', 'Winmart', '', 'hsbc', 20, '', ''],
+    ])))).toEqual(['shortcodes']));
 });

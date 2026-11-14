@@ -13,8 +13,8 @@ export async function drainOutbox(env: Env): Promise<void> {
   const items = await dueOutbox(env.DB, 10);
   for (const it of items) {
     try {
-      const { isCard, ...raw } = JSON.parse(it.payloadJson) as Omit<ExactEntry, 'source'> & {
-        source?: DeferredSource | null; isCard?: boolean;
+      const { isCard, targetMonth: _stale, ...raw } = JSON.parse(it.payloadJson) as Omit<ExactEntry, 'source'> & {
+        source?: DeferredSource | null; isCard?: boolean; targetMonth?: number;
       };
       const entry: ExactEntry = { ...raw, source: legacySource({ source: raw.source, isCard }) };
       await performWrite(env, it.chatId, entry);

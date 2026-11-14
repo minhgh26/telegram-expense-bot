@@ -23,20 +23,20 @@ export const isCategory = (s: string): s is CategoryKey =>
  * Tập đóng nguồn trả sau. Khoá = token gõ trong tin nhắn, cũng là tiền tố ghép
  * vào ô mô tả khi ghi (xem `buildRow` ở src/handlers/write.ts).
  *
- * `defaultCutoffDay` là mặc định khai báo trong code, dùng khi sheet `Note`
- * không có mốc riêng cho nguồn đó (xem `note.ts`, khối `H`–`I`).
+ * Nguồn chỉ là nhãn: nó không ảnh hưởng khoản nằm ở tháng nào (ADR-0002).
  */
 export const DEFERRED_SOURCES = {
-  hsbc: { label: 'Thẻ HSBC',           emoji: '💳', defaultCutoffDay: 7 },
-  vpb:  { label: 'Thẻ VPBank',         emoji: '🟢', defaultCutoffDay: 26 },
-  spl:  { label: 'SPayLater',          emoji: '🛍️', defaultCutoffDay: 24 },
-  zlp:  { label: 'Ví trả sau ZaloPay', emoji: '🔵', defaultCutoffDay: 28 },
+  hsbc: { label: 'Thẻ HSBC',           emoji: '💳' },
+  vpb:  { label: 'Thẻ VPBank',         emoji: '🟢' },
+  spl:  { label: 'SPayLater',          emoji: '🛍️' },
+  zlp:  { label: 'Ví trả sau ZaloPay', emoji: '🔵' },
 } as const;
 
 /**
- * Tiền tố `[cc] ` của các dòng ghi TRƯỚC khi thẻ HSBC đổi token từ `cc` sang
- * `hsbc`. Các dòng đó nằm nguyên trong file, không backfill; `cc` giờ không còn
- * là token — gõ vào tin nhắn thì nó là chữ thường trong mô tả.
+ * Token cũ của thẻ HSBC, chỉ còn phục vụ `legacySource` (src/parse/message.ts) đọc
+ * các bản ghi trong hàng đợi ghi lại / khoản mơ hồ chờ nút lưu trước khi đổi token.
+ * Các dòng `[cc]` trong file đã được đổi thành `[hsbc]`; `cc` không còn là token —
+ * gõ vào tin nhắn thì nó là chữ thường trong mô tả.
  */
 export const LEGACY_HSBC_TOKEN = 'cc';
 
@@ -48,24 +48,6 @@ export type DeferredSource = keyof typeof DEFERRED_SOURCES;
 
 export const isDeferredSource = (s: string): s is DeferredSource =>
   Object.prototype.hasOwnProperty.call(DEFERRED_SOURCES, s);
-
-/** Mốc chốt mặc định của mọi nguồn, khai báo trong code. */
-export const defaultCutoffDays = (): Record<DeferredSource, number> =>
-  Object.fromEntries(
-    Object.entries(DEFERRED_SOURCES).map(([k, v]) => [k, v.defaultCutoffDay]),
-  ) as Record<DeferredSource, number>;
-
-/**
- * Mốc chốt của một nguồn, tra trong `cutoffDays` (mặc định: mặc định khai báo
- * trong code — `loadNote` trả về bản đã áp mốc từ sheet `Note` khi có). `0`
- * khi không có nguồn — giá trị không có ý nghĩa riêng, `paymentMonth`
- * (src/billing.ts) bỏ qua cutoff khi `source` là `null` nên số nào cũng cho
- * cùng kết quả.
- */
-export const cutoffDayFor = (
-  source: DeferredSource | null,
-  cutoffDays: Record<DeferredSource, number> = defaultCutoffDays(),
-): number => (source ? cutoffDays[source] : 0);
 
 export const sheetName = (month: number) => `Tháng ${month}`;
 export const tableName = (cat: CategoryKey, month: number) =>

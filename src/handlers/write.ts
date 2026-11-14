@@ -1,8 +1,8 @@
-import { CATEGORIES, sheetName, tableName } from '../config';
+import { CATEGORIES, type CategoryKey, sheetName, tableName } from '../config';
 import { logWrite, setLastWrite } from '../db';
 import type { Env } from '../env';
 import type { RowValues } from '../graph/sheet';
-import { computeTotals, sumDay } from '../graph/totals';
+import { computeTotals } from '../graph/totals';
 import { appendRow, fixDateFormat, readSheet } from '../graph/workbook';
 import { toExcelSerial, vnToday } from '../parse/date';
 import type { ParsedEntry } from '../parse/message';
@@ -12,9 +12,17 @@ import { tidyTable } from './tidy';
 
 export type ExactEntry = Omit<ParsedEntry, 'amount'> & {
   amount: number;
-  /** Tháng tiền rời tài khoản — khác tháng phát sinh khi quẹt thẻ sau mốc chốt. */
-  targetMonth: number;
 };
+
+/**
+ * Bảng và sheet nhận khoản: luôn là tháng của khoản (`date.m`), bất kể nguồn —
+ * xem docs/adr/0002-khoan-nam-o-thang-tieu-khong-phai-thang-tra.md. Bản ghi cũ
+ * trong hàng đợi ghi lại có thể còn mang `targetMonth`; trường đó bị bỏ qua.
+ */
+export function destinationOf(e: { category: CategoryKey; date: { m: number } }):
+{ table: string; sheet: string } {
+  return { table: tableName(e.category, e.date.m), sheet: sheetName(e.date.m) };
+}
 
 /**
  * Ba ô sẽ ghi vào Excel. Hàm thuần — không cần Env hay Graph để gọi.
@@ -30,8 +38,7 @@ export function buildRow(e: ExactEntry): RowValues {
 export async function performWrite(
   env: Env, chatId: number, e: ExactEntry,
 ): Promise<void> {
-  const table = tableName(e.category, e.targetMonth);
-  const sheet = sheetName(e.targetMonth);
+  const { table, sheet } = destinationOf(e);
   // Bản ghi vào Excel và bản lưu để /undo đối chiếu PHẢI là cùng một mảng — dựng
   // hai lần thì một chỗ đổi mà quên chỗ kia sẽ khiến /undo xoá nhầm dòng.
   const values = buildRow(e);
@@ -39,15 +46,10 @@ export async function performWrite(
 
   const index = await appendRow(env, table, values);
 
-  // Khoản trả sau nhảy tháng: chi tiền mặt cùng ngày nằm ở sheet tháng phát sinh,
-  // khoản vừa ghi nằm ở sheet tháng thanh toán — phải cộng cả hai.
-  const crossed = e.targetMonth !== e.date.m;
-
-  // Vá định dạng và ghi D1 chạy song song với hai lệnh đọc: chúng không đụng tới
+  // Vá định dạng và ghi D1 chạy song song với lệnh đọc: chúng không đụng tới
   // `values` nên không ảnh hưởng kết quả đọc, mà lại tiết kiệm được thời gian chờ.
-  const [dest, origin] = await Promise.all([
+  const [dest] = await Promise.all([
     readSheet(env, sheet),
-    crossed ? readSheet(env, sheetName(e.date.m)) : Promise.resolve(null),
     fixDateFormat(env, table, index),
     setLastWrite(env.DB, chatId, {
       sheet, tableName: table, rowIndex: index,
@@ -63,7 +65,6 @@ export async function performWrite(
   // Tổng theo ngày CỦA KHOẢN VỪA GHI, không phải hôm nay — để con số hiện ra
   // luôn chứa khoản vừa ghi, kể cả khi ghi lùi ngày.
   const totals = computeTotals(dest, label, serial);
-  if (origin) totals.today += sumDay(origin, serial);
 
   const today = vnToday(Date.now());
   const isToday = today.y === e.date.y && today.m === e.date.m && today.d === e.date.d;

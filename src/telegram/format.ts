@@ -1,6 +1,5 @@
 import { DEFERRED_SOURCES, type DeferredSource } from '../config';
 import type { NoteConfig } from '../note';
-import type { Amount } from '../parse/amount';
 import type { VNDate } from '../parse/date';
 import type { Totals } from '../graph/totals';
 
@@ -23,7 +22,7 @@ export function alignedRows(rows: [string, string][]): string {
 export function confirmation(
   e: {
     description: string; amount: number; date: VNDate; label: string;
-    source: DeferredSource | null; targetMonth: number;
+    source: DeferredSource | null;
   },
   t: Totals,
   isToday: boolean,
@@ -33,51 +32,18 @@ export function confirmation(
   ];
 
   if (e.source) {
-    const emoji = DEFERRED_SOURCES[e.source].emoji;
-    head.push(
-      e.targetMonth === e.date.m
-        ? `${emoji} trả tháng ${e.targetMonth}`
-        : `${emoji} tiêu ${dm(e.date)} → trả tháng ${e.targetMonth}`,
-    );
+    const { emoji, label } = DEFERRED_SOURCES[e.source];
+    head.push(`${emoji} ${label}`);
   }
 
   const body = alignedRows([
-    // Nhãn lấy theo THÁNG ĐÍCH. Lấy theo tháng phát sinh thì với khoản thẻ nhảy
-    // tháng, con số hiện ra sẽ không chứa khoản vừa ghi.
-    [`${e.label} (T${e.targetMonth})`, formatVND(t.categoryMonth)],
+    [`${e.label} (T${e.date.m})`, formatVND(t.categoryMonth)],
     // Khi ghi lùi ngày, dòng giữa phải là tổng của NGÀY ĐÓ, không phải hôm nay —
     // nếu không, con số hiện ra sẽ không chứa khoản vừa ghi.
     [isToday ? 'Hôm nay' : `Ngày ${dm(e.date)}`, formatVND(t.today)],
-    [`Tổng chi T${e.targetMonth}`, formatVND(t.monthSpend)],
+    [`Tổng chi T${e.date.m}`, formatVND(t.monthSpend)],
   ]);
   return `${head.join('\n')}\n\n<pre>${esc(body)}</pre>`;
-}
-
-/**
- * Khoản trả sau tháng 12 rơi sang kỳ trả năm sau — in lại đủ để chép tay, cho
- * mọi nguồn.
- *
- * Kèm emoji nguồn (không phải chữ, giống dòng nguồn trong `confirmation`) để
- * người chép tay biết viết tiền tố nào — mô tả ở đây vẫn là chữ người dùng gõ,
- * không ghép tiền tố (đó là việc riêng của `buildRow`).
- */
-export function carryOverRefusal(
-  e: {
-    description: string; amount: Amount; date: VNDate; label: string;
-    source: DeferredSource | null;
-  },
-  error: string,
-): string {
-  const money = e.amount.kind === 'exact'
-    ? formatVND(e.amount.amount)
-    : `${formatVND(e.amount.low)} hoặc ${formatVND(e.amount.high)}`;
-  const sourceTag = e.source ? ` ${DEFERRED_SOURCES[e.source].emoji}` : '';
-
-  return [
-    `⚠️ ${esc(error)}`,
-    `${esc(e.description)}${sourceTag} · ${money} · ${dm(e.date)} · ${esc(e.label)}`,
-    'Chép tay vào file sang năm nhé.',
-  ].join('\n');
 }
 
 export function helpText(note: NoteConfig): string {
@@ -98,9 +64,8 @@ export function helpText(note: NoteConfig): string {
     '',
     '<b>Nguồn trả sau</b>',
     'Thêm một token, đặt đâu trong câu cũng được: <code>/food ăn trưa 40k spl</code>',
-    'Quẹt sau ngày chốt thì tính vào tháng sau:',
     ...Object.entries(DEFERRED_SOURCES).map(
-      ([token, s]) => `<code>${token}</code> ${s.emoji} ${s.label} — chốt ngày ${note.cutoffDays[token as DeferredSource]}`,
+      ([token, s]) => `<code>${token}</code> ${s.emoji} ${s.label}`,
     ),
     '',
     '<b>Lệnh khác</b>',
