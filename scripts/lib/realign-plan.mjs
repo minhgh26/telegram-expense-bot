@@ -120,3 +120,21 @@ export function needsBlankRow(rows) {
   const last = rows[rows.length - 1];
   return !last || !isBlankRow(last);
 }
+
+/**
+ * Có gửi lại yêu cầu HTTP không. 429 = Graph chưa làm gì → luôn gửi lại được. 5xx có thể là
+ * "đã áp dụng nhưng trả lời lỗi" (xem .scratch/ghi-trung): chỉ gửi lại lệnh LẶP ĐƯỢC (đọc,
+ * PATCH giá trị cố định, sắp). DELETE theo chỉ số và rows/add thì KHÔNG: gửi lại là xoá nhầm
+ * dòng kế bên hoặc thêm bản thứ hai.
+ */
+export function shouldRetry({ status, idempotent, attempt, max = 4 }) {
+  if (attempt >= max) return false;
+  if (status === 429) return true;
+  return status >= 500 && idempotent;
+}
+
+/** Lệnh ghi lỗi mà Graph CÓ THỂ đã áp dụng (lỗi mạng / 5xx). 4xx và 429 thì chắc chắn chưa. */
+export function isAmbiguousFailure(err) {
+  const status = err?.status;
+  return status === undefined || status >= 500;
+}

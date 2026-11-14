@@ -5,9 +5,11 @@ import {
   SPEND_GROUPS,
   WORKBOOK_YEAR,
   findOldRow,
+  isAmbiguousFailure,
   isSortedByDate,
   needsBlankRow,
   planSheet as plan,
+  shouldRetry,
   serialToDate,
 } from '../scripts/lib/realign-plan.mjs';
 import { CATEGORIES, DEFERRED_SOURCES, WORKBOOK_YEAR as SRC_YEAR } from '../src/config';
@@ -170,5 +172,32 @@ describe('needsBlankRow / isSortedByDate (bản JS của tidy-plan)', () => {
     expect(isSortedByDate([['a', 1, 1], ['b', 2, 1], ['', '', '']])).toBe(true);
     expect(isSortedByDate([['a', 2, 1], ['b', 1, 1]])).toBe(false);
     expect(isSortedByDate([['', '', ''], ['b', 1, 1]])).toBe(false);
+  });
+});
+
+describe('shouldRetry (không gửi lại lệnh ghi không-lặp-được khi 5xx)', () => {
+  it('429: chưa áp dụng gì nên gửi lại được, kể cả DELETE / rows/add', () => {
+    expect(shouldRetry({ status: 429, idempotent: false, attempt: 0 })).toBe(true);
+    expect(shouldRetry({ status: 429, idempotent: true, attempt: 0 })).toBe(true);
+  });
+  it('5xx: chỉ gửi lại lệnh lặp được (đọc, PATCH, sắp), KHÔNG gửi lại DELETE / rows/add', () => {
+    expect(shouldRetry({ status: 503, idempotent: true, attempt: 0 })).toBe(true);
+    expect(shouldRetry({ status: 504, idempotent: false, attempt: 0 })).toBe(false);
+    expect(shouldRetry({ status: 500, idempotent: false, attempt: 0 })).toBe(false);
+  });
+  it('lỗi 4xx khác và hết lượt thì thôi', () => {
+    expect(shouldRetry({ status: 404, idempotent: true, attempt: 0 })).toBe(false);
+    expect(shouldRetry({ status: 429, idempotent: true, attempt: 4 })).toBe(false);
+  });
+});
+
+describe('isAmbiguousFailure (lệnh ghi có thể đã được áp dụng)', () => {
+  it('lỗi mạng (không có status) và 5xx là mơ hồ', () => {
+    expect(isAmbiguousFailure(new Error('ECONNRESET'))).toBe(true);
+    expect(isAmbiguousFailure(Object.assign(new Error('x'), { status: 504 }))).toBe(true);
+  });
+  it('4xx và 429 là chắc chắn chưa ghi', () => {
+    expect(isAmbiguousFailure(Object.assign(new Error('x'), { status: 400 }))).toBe(false);
+    expect(isAmbiguousFailure(Object.assign(new Error('x'), { status: 429 }))).toBe(false);
   });
 });

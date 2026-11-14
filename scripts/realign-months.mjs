@@ -2,10 +2,12 @@
 // Quét 108 bảng <nhóm>_<tháng> của file mà .dev.vars (DRIVE_ITEM_ID) đang trỏ và in kế hoạch.
 // Không có --apply: CHỈ ĐỌC. Có --apply: thực hiện kế hoạch mà KHÔNG BAO GIỜ làm mất dòng:
 // thêm vào đích trước, xoá nguồn sau, xoá theo chỉ số tìm lại từ NỘI DUNG CŨ (không theo chỉ số kế hoạch).
+// DELETE và rows/add không bao giờ gửi lại khi 5xx (có thể đã áp dụng); lỗi mơ hồ → "có thể trùng".
 // Logic phân loại nằm ở scripts/lib/realign-plan.mjs (hàm thuần, có test).
 import { getAccessToken, loadEnv } from './lib/dev-vars.mjs';
 import {
-  GROUPS, WORKBOOK_YEAR, findOldRow, isSortedByDate, needsBlankRow, planSheet, serialToDate,
+  GROUPS, WORKBOOK_YEAR, findOldRow, isAmbiguousFailure, isSortedByDate, needsBlankRow, planSheet,
+  serialToDate, shouldRetry,
 } from './lib/realign-plan.mjs';
 
 // Từ chối tham số lạ TRƯỚC khi lấy token (lấy token là xoay refresh token).
@@ -115,61 +117,103 @@ const STALE_RETRIES = 4;
 const STALE_WAIT_MS = 1500;
 const tableUrl = (ITEM, t) => `${ITEM}/workbook/tables/${encodeURIComponent(t)}`;
 
-/** Gọi Graph, thử lại khi bị giới hạn tốc độ / lỗi tạm. Ném khi lỗi thật. */
-async function graph(H, url, init = {}) {
+/**
+ * Gọi Graph. 429 gửi lại; 5xx chỉ gửi lại lệnh lặp được (GET, PATCH, hoặc `idempotent: true`).
+ * DELETE theo chỉ số và rows/add KHÔNG bao giờ gửi lại khi 5xx: có thể Graph đã áp dụng rồi
+ * (.scratch/ghi-trung), gửi lại là xoá nhầm dòng kế bên hoặc thêm bản thứ hai.
+ * Ném Error có `.status` khi lỗi HTTP; lỗi mạng ném không có `.status` (xem isAmbiguousFailure).
+ */
+async function graph(H, url, { idempotent, ...init } = {}) {
+  const safe = idempotent ?? ['GET', 'PATCH'].includes(init.method ?? 'GET');
   for (let attempt = 0; ; attempt++) {
     const res = await fetch(url, {
       ...init,
       headers: { ...H, ...(init.body ? { 'content-type': 'application/json' } : {}) },
     });
     if (res.ok) return res.status === 204 ? null : res.json();
-    if ((res.status === 429 || res.status >= 500) && attempt < 4) {
+    if (shouldRetry({ status: res.status, idempotent: safe, attempt })) {
       await sleep((Number(res.headers.get('retry-after')) || 2 ** attempt) * 1000);
       continue;
     }
-    throw new Error(`${init.method ?? 'GET'} ${url.split('/workbook/')[1] ?? url} → ${res.status} ${await res.text()}`);
+    throw Object.assign(
+      new Error(`${init.method ?? 'GET'} ${url.split('/workbook/')[1] ?? url} → ${res.status} ${await res.text()}`),
+      { status: res.status },
+    );
   }
 }
 
 async function apply({ ITEM, H, moves, retags, stays, counts }) {
   console.log('\n=== Thực hiện (--apply) ===');
-  const done = { moved: [], retagged: [], duplicates: [], errors: [] };
+  const done = { moved: [], retagged: [], notRetagged: [], duplicates: [], errors: [] };
   const received = new Set();
+  const failedStays = new Set(); // dòng ở yên mà đổi mô tả hỏng: báo ở "Chưa đổi mô tả", không đếm lần nữa ở "Ở yên"
+  const label = (c) => `${c.table} · ${describe(c.oldValue)}`;
 
-  // Đọc lại bảng và chỉ tin bản đọc có số dòng đúng như dự kiến: bản đọc cũ (chưa thấy lệnh
-  // thêm/xoá trước đó) có chỉ số lệch, xoá theo nó là xoá nhầm dòng. Không ổn định → null.
-  const readFresh = async (table) => {
-    for (let i = 0; i < STALE_RETRIES; i++) {
+  const readRows = async (table) => {
+    const j = await graph(H, `${tableUrl(ITEM, table)}/rows?$select=index,values`);
+    return (j.value ?? []).map((r) => r.values[0]);
+  };
+  // Đọc lại bảng tới khi `pick(rows)` trả giá trị khác undefined; hết lượt → null.
+  const poll = async (table, pick, tries) => {
+    for (let i = 0; i < tries; i++) {
       if (i > 0) await sleep(STALE_WAIT_MS);
-      const j = await graph(H, `${tableUrl(ITEM, table)}/rows?$select=index,values`);
-      const rows = (j.value ?? []).map((r) => r.values[0]);
-      if (rows.length === counts.get(table)) return rows;
+      const got = await pick(await readRows(table));
+      if (got !== undefined) return got;
     }
     return null;
   };
-  const label = (c) => `${c.table} · ${describe(c.oldValue)}`;
+  // Tìm chỉ số của dòng theo NỘI DUNG CŨ. Chỉ tin bản đọc có số dòng đúng như dự kiến, rồi
+  // đọc lại đúng dòng đó (itemAt) và so nội dung một lần nữa: số dòng bằng nhau vẫn có thể là
+  // bản đọc cũ (thêm và xoá triệt tiêu nhau), xoá theo nó là xoá nhầm dòng. `prefer` = chỉ số
+  // kế hoạch, chỉ là gợi ý ưu tiên, không bao giờ được tin mà không so nội dung.
+  const locate = (table, oldValue, prefer) => poll(table, async (rows) => {
+    if (rows.length !== counts.get(table)) return undefined;
+    const idx = prefer !== undefined && rows[prefer] && findOldRow([rows[prefer]], oldValue) === 0
+      ? prefer : findOldRow(rows, oldValue);
+    if (idx === null) return undefined;
+    const live = await graph(H, `${tableUrl(ITEM, table)}/rows/itemAt(index=${idx})`);
+    return live?.values?.[0] && findOldRow([live.values[0]], oldValue) === 0 ? idx : undefined;
+  }, STALE_RETRIES);
+  // Sau lỗi mơ hồ (lệnh ghi có thể đã áp dụng) số dòng dự kiến không còn đáng tin: đo lại cho
+  // tới khi hai lần đọc liền nhau cùng số dòng, để các dòng sau không bị kẹt "bản đọc không ổn định".
+  const resync = async (table) => {
+    let prev = null;
+    for (let i = 0; i <= STALE_RETRIES; i++) {
+      await sleep(STALE_WAIT_MS);
+      let n;
+      try { n = (await readRows(table)).length; } catch { continue; }
+      if (n === prev) break;
+      prev = n;
+    }
+    if (prev !== null) counts.set(table, prev);
+  };
 
-  // 1. Đổi mô tả tại chỗ (dòng không dời): đọc lại, khớp nội dung cũ rồi mới PATCH.
+  // 1. Đổi mô tả tại chỗ (dòng không dời): đọc lại, khớp nội dung cũ rồi mới PATCH CHỈ ô mô tả
+  //    (null = giữ nguyên ngày và số tiền, kể cả công thức người dùng gõ tay).
   for (const c of [...retags, ...stays.filter((s) => s.descChanged)]) {
     try {
-      const rows = await readFresh(c.table);
-      if (!rows) { done.duplicates.push(`${label(c)} — bản đọc không ổn định, chưa đổi mô tả`); continue; }
-      const atIndex = rows[c.index] && findOldRow([rows[c.index]], c.oldValue) === 0;
-      const idx = atIndex ? c.index : findOldRow(rows, c.oldValue);
-      if (idx === null) { done.duplicates.push(`${label(c)} — không tìm thấy dòng cũ, chưa đổi mô tả`); continue; }
-      const cur = rows[idx];
+      const idx = await locate(c.table, c.oldValue, c.index);
+      if (idx === null) {
+        done.notRetagged.push(`${label(c)} — không tìm thấy dòng cũ / bản đọc không ổn định, chưa đổi mô tả`);
+        failedStays.add(c); continue;
+      }
       await graph(H, `${tableUrl(ITEM, c.table)}/rows/itemAt(index=${idx})/range`, {
-        method: 'PATCH',
-        body: JSON.stringify({ values: [[c.newValue[0], cur[1], cur[2]]] }),
+        method: 'PATCH', body: JSON.stringify({ values: [[c.newValue[0], null, null]] }),
       });
-      done.retagged.push(label(c));
+      if (c.kind === 'retag') done.retagged.push(label(c));
       console.log(`đổi mô tả: ${label(c)}`);
-    } catch (err) { done.errors.push(`${label(c)} — ${err.message}`); }
+    } catch (err) { done.notRetagged.push(`${label(c)} — ${err.message}`); failedStays.add(c); }
   }
 
-  // 2. Dời: thêm vào đích → vá định dạng ngày → đọc lại nguồn → xoá theo nội dung cũ.
+  // 2. Dời: kiểm nguồn còn đó → thêm vào đích → vá định dạng ngày → đọc lại nguồn → xoá.
   for (const c of moves) {
     if (!counts.has(c.target)) { done.errors.push(`${label(c)} — bảng đích ${c.target} không tồn tại, chưa dời`); continue; }
+    // Không tìm được nguồn thì KHÔNG thêm: thêm rồi mới phát hiện là sinh dòng trùng.
+    try {
+      if ((await locate(c.table, c.oldValue)) === null) {
+        done.errors.push(`${label(c)} — không tìm thấy dòng nguồn / bản đọc không ổn định, chưa dời`); continue;
+      }
+    } catch (err) { done.errors.push(`${label(c)} — chưa dời, đọc nguồn lỗi: ${err.message}`); continue; }
     let added;
     try {
       const r = await graph(H, `${tableUrl(ITEM, c.target)}/rows/add`, {
@@ -179,36 +223,43 @@ async function apply({ ITEM, H, moves, retags, stays, counts }) {
       added = r.index;
       counts.set(c.target, counts.get(c.target) + 1);
       received.add(c.target);
-    } catch (err) { done.errors.push(`${label(c)} — thêm vào ${c.target} lỗi: ${err.message}`); continue; }
+    } catch (err) {
+      if (isAmbiguousFailure(err)) {
+        // Có thể Graph đã thêm rồi: không thử lại, không xoá nguồn, để người dùng kiểm.
+        done.duplicates.push(`${label(c)} — thêm vào ${c.target} báo lỗi nhưng CÓ THỂ ĐÃ THÊM, chưa xoá nguồn: ${err.message}`);
+        received.add(c.target);
+        await resync(c.target);
+      } else done.errors.push(`${label(c)} — thêm vào ${c.target} lỗi: ${err.message}`);
+      continue;
+    }
     try {
       await graph(H, `${tableUrl(ITEM, c.target)}/rows/itemAt(index=${added})/range`, {
         method: 'PATCH', body: JSON.stringify({ numberFormat: [[null, 'd-mmm', null]] }),
       });
     } catch (err) { done.errors.push(`${c.target} dòng ${added}: chưa vá được định dạng ngày — ${err.message}`); }
     try {
-      const rows = await readFresh(c.table);
-      const idx = rows ? findOldRow(rows, c.oldValue) : null;
+      const idx = await locate(c.table, c.oldValue);
       if (idx === null) { done.duplicates.push(`${label(c)} — đã thêm vào ${c.target}, KHÔNG xoá được dòng nguồn (không thấy / bản đọc không ổn định)`); continue; }
-      await graph(H, `${tableUrl(ITEM, c.table)}/rows/itemAt(index=${idx})`, { method: 'DELETE' });
+      try {
+        await graph(H, `${tableUrl(ITEM, c.table)}/rows/itemAt(index=${idx})`, { method: 'DELETE' });
+      } catch (err) {
+        done.duplicates.push(`${label(c)} — đã thêm vào ${c.target}, xoá nguồn lỗi (KHÔNG gửi lại; có thể đã xoá hoặc chưa): ${err.message}`);
+        if (isAmbiguousFailure(err)) await resync(c.table);
+        continue;
+      }
       counts.set(c.table, counts.get(c.table) - 1);
       done.moved.push(`${label(c)} → ${c.target}`);
       console.log(`dời: ${label(c)} → ${c.target}`);
-    } catch (err) { done.duplicates.push(`${label(c)} — đã thêm vào ${c.target}, xoá nguồn lỗi: ${err.message}`); }
+    } catch (err) { done.duplicates.push(`${label(c)} — đã thêm vào ${c.target}, đọc lại nguồn lỗi: ${err.message}`); }
   }
 
   // 3. Dọn bảng đã nhận dòng: chỉ sắp + thêm dòng trống, không xoá.
   for (const table of received) {
     try {
       await graph(H, `${tableUrl(ITEM, table)}/sort/apply`, {
-        method: 'POST', body: JSON.stringify({ fields: [{ key: 1, ascending: true }] }),
+        method: 'POST', idempotent: true, body: JSON.stringify({ fields: [{ key: 1, ascending: true }] }),
       });
-      let rows = null;
-      for (let i = 0; i < 2 && !rows; i++) {
-        if (i > 0) await sleep(STALE_WAIT_MS);
-        const j = await graph(H, `${tableUrl(ITEM, table)}/rows?$select=index,values`);
-        const r = (j.value ?? []).map((x) => x.values[0]);
-        if (isSortedByDate(r)) rows = r;
-      }
+      const rows = await poll(table, (r) => (isSortedByDate(r) ? r : undefined), 2);
       if (!rows) throw new Error('bản đọc sau khi sắp vẫn là thứ tự cũ, bỏ qua thêm dòng trống');
       if (needsBlankRow(rows)) {
         await graph(H, `${tableUrl(ITEM, table)}/rows/add`, { method: 'POST', body: JSON.stringify({ values: [[null, null, null]] }) });
@@ -217,18 +268,25 @@ async function apply({ ITEM, H, moves, retags, stays, counts }) {
     } catch (err) { done.errors.push(`dọn ${table} — ${err.message}`); }
   }
 
+  // Mỗi dòng đếm đúng một lần (như bản in kế hoạch): dòng ở yên đã đổi mô tả chỉ nằm ở "Ở yên"
+  // (in mô tả mới); dòng đổi mô tả hỏng chỉ nằm ở "Chưa đổi mô tả".
+  const stayOk = stays.filter((c) => !failedStays.has(c));
   const list = (title, xs) => { console.log(`--- ${title} (${xs.length}) ---`); xs.forEach((x) => console.log(x)); };
   console.log('\n=== Báo cáo ===');
   list('Đã dời', done.moved);
-  list('Đã đổi mô tả', done.retagged);
-  list('Ở yên', stays.map((c) => `${c.table} · ${describe(c.oldValue)}`));
+  list('Đã đổi mô tả tại chỗ', done.retagged);
+  list('Ở yên', stayOk.map((c) => `${c.table} · ${describe(c.descChanged ? c.newValue : c.oldValue)}${c.descChanged ? '   (đã đổi mô tả tại chỗ)' : ''}`));
+  list('Chưa đổi mô tả (dòng vẫn như cũ, chạy lại được)', done.notRetagged);
   list('Có thể trùng (kiểm tay)', done.duplicates);
   list('Lỗi', done.errors);
   console.log(
-    `\nđã dời ${done.moved.length} · đổi mô tả ${done.retagged.length} · ở yên ${stays.length} · ` +
-    `có thể trùng ${done.duplicates.length} · lỗi ${done.errors.length}`,
+    `\nđã dời ${done.moved.length} · đổi mô tả tại chỗ ${done.retagged.length} · ở yên ${stayOk.length} · ` +
+    `chưa đổi mô tả ${done.notRetagged.length} · có thể trùng ${done.duplicates.length} · lỗi ${done.errors.length}`,
   );
-  if (done.duplicates.length || done.errors.length) process.exitCode = 1;
+  if (done.duplicates.length) {
+    console.log('CẢNH BÁO: xoá tay các dòng trùng ở bảng đích TRƯỚC khi chạy lại --apply, nếu không dòng nguồn còn sót sẽ bị thêm lần nữa.');
+  }
+  if (done.duplicates.length || done.errors.length || done.notRetagged.length) process.exitCode = 1;
 }
 
 // Từ đây refresh token của bot đã chết: mọi lối ra đều phải nhắc /reauth.

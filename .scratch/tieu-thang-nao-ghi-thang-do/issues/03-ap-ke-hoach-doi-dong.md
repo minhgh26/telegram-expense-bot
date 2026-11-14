@@ -35,9 +35,20 @@ Chi tiết ở `../spec.md` mục "Công cụ dời dòng" và "Thứ tự tri�
 
 ## Comments
 
-### Bàn giao (code xong, chưa chạy thật)
+### 2026-11-14 — bàn giao (code xong, chưa chạy thật), sửa sau review
 
-- `node scripts/realign-months.mjs --apply`; không tham số vẫn chỉ đọc. Hàm thuần `findOldRow` / `isSortedByDate` / `needsBlankRow` ở `scripts/lib/realign-plan.mjs` (có test).
-- Thêm một lớp an toàn: bản đọc nguồn chỉ được tin khi số dòng bằng số dự kiến (script tự theo dõi); bản đọc cũ → thử lại, vẫn không ổn định thì KHÔNG xoá, vào "có thể trùng".
-- Đã chạy thử với Graph giả trong bộ nhớ (dời + `[cc]` + ★ + dọn): đúng. Chưa chạy trên Graph thật.
-- Còn lại cho người dùng: tiêu chí 7 trở đi (chạy `--apply` trên bản TEST, nghiệm thu, file thật, `/reauth`). Tiêu chí 6 (chạy lại chỉ đọc) và 7 (`audit-real.mjs`) tick theo lần chạy thật.
+Gate: `npx tsc --noEmit` sạch, `npx vitest run` xanh. `--apply` không có test tự động (đúng spec); đã chạy thử với Graph giả trong bộ nhớ: đường thành công, DELETE trả 504, `rows/add` trả 504, bản đọc xáo thứ tự. Chưa chạy trên Graph thật.
+
+- `node scripts/realign-months.mjs --apply`; không tham số vẫn chỉ đọc. Hàm thuần `findOldRow` / `isSortedByDate` / `needsBlankRow` / `shouldRetry` / `isAmbiguousFailure` ở `scripts/lib/realign-plan.mjs` (có test).
+
+**Quyết định ticket không quy định (người dùng cần biết)**
+- Trước khi xoá hoặc đổi mô tả, script đọc lại bảng, chỉ tin bản đọc có số dòng đúng như dự kiến, rồi đọc lại đúng dòng đó (`itemAt`) và so nội dung lần nữa. Trước khi THÊM vào đích cũng kiểm nguồn còn đó; không thấy thì không thêm, báo ở "Lỗi". Bản đọc không ổn định → KHÔNG xoá.
+- Gặp 429 thì chờ và gửi lại. Gặp 5xx hoặc lỗi mạng: đọc/PATCH/sắp được gửi lại, nhưng DELETE và `rows/add` KHÔNG bao giờ gửi lại (có thể Graph đã làm rồi). Khi đó dòng vào "Có thể trùng (kiểm tay)", script đo lại số dòng bảng rồi đi tiếp. Tệ nhất: một dòng trùng ở bảng đích, hoặc một dòng nguồn chưa xoá.
+- Đổi mô tả hỏng không phải "có thể trùng": nằm ở mục riêng "Chưa đổi mô tả" (dòng vẫn như cũ, chạy lại được), mã thoát vẫn khác 0.
+- Báo cáo đếm mỗi dòng một lần: dòng năm khác đã đổi mô tả chỉ nằm ở "Ở yên" (in mô tả mới); "Đã đổi mô tả tại chỗ" chỉ gồm dòng của mục "Đổi [cc] → [hsbc] tại chỗ" như bản in kế hoạch.
+- Đổi mô tả chỉ ghi ô mô tả (ngày và số tiền gửi `null` = giữ nguyên, kể cả công thức gõ tay). Chưa kiểm trên Graph thật rằng `null` trong `values` được bỏ qua như trong `numberFormat`: kiểm khi nghiệm thu bản TEST (dòng đổi mô tả vẫn giữ ngày/số tiền/công thức).
+- Có "có thể trùng": xoá tay dòng trùng ở bảng đích TRƯỚC khi chạy lại `--apply` (script in cảnh báo). Chưa tự kiểm bảng đích đã có dòng đó chưa, vì hai khoản giống hệt hợp lệ.
+- `--apply` in kế hoạch rồi ghi ngay trong cùng một lần chạy, không hỏi xác nhận; file đích chọn bằng `.dev.vars` (như spec). Kiểm dòng "File đích: …" trước khi chạy; Ctrl+C được nếu sai. Không thêm bước xác nhận vì spec không đòi.
+- Chưa chặn bot ghi trong lúc chạy (lệnh outbox còn xếp hàng có thể ghi + sắp xếp bảng giữa chừng): theo spec, người dùng không gửi tin ghi khoản và outbox nên rỗng trước khi chạy.
+
+**Còn lại cho người dùng:** tiêu chí 6 trở đi (chạy lại chỉ đọc, `audit-real.mjs`, `--apply` trên bản TEST, nghiệm thu, file thật, `/reauth`). Tiêu chí 6 và 7 tick theo lần chạy thật.

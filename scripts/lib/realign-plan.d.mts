@@ -18,3 +18,5 @@ export function planSheet(group: string, sheetMonth: number, rows: unknown[][]):
 export function findOldRow(rows: unknown[][], oldValue: unknown[]): number | null;
 export function isSortedByDate(rows: unknown[][]): boolean;
 export function needsBlankRow(rows: unknown[][]): boolean;
+export function shouldRetry(o: { status: number; idempotent: boolean; attempt: number; max?: number }): boolean;
+export function isAmbiguousFailure(err: unknown): boolean;
