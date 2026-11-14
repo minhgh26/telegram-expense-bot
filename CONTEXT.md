@@ -57,21 +57,24 @@ bởi một lượt chạy khác. Không phải lỗi: lượt thua vứt token 
 Một dòng chi tiêu hoặc thu nhập người dùng gửi trong một tin nhắn.
 _Tránh_: giao dịch, bản ghi.
 
-**Tháng đích**:
-Tháng mà khoản được ghi vào, đã tính cả quy tắc thẻ tín dụng. Khác với tháng phát
-sinh khi quẹt thẻ sau ngày chốt sao kê.
-_Tránh_: dùng "tháng" trống không khi hai tháng này có thể lệch nhau.
+**Tháng của khoản**:
+Tháng của ngày tiêu. Khoản luôn nằm ở sheet của tháng này, bất kể trả bằng nguồn nào —
+mỗi sheet tháng là "đã tiêu bao nhiêu trong tháng", không phải "tiền đã rời tài khoản
+bao nhiêu". Vì vậy cuối kì ở sheet `Tóm tắt` không phải số dư ngân hàng thật.
+_Tránh_: "tháng đích", "tháng trả" — từ thời khoản trả sau được dời sang tháng tiền rời
+tài khoản; khái niệm đó đã bỏ.
 
-**Ngày chốt sao kê**:
-Ngày trong tháng mà kỳ sao kê thẻ tín dụng khép lại. Quẹt sau ngày này thì trả
-vào tháng sau.
+**Khoản lệch tháng**:
+Dòng có ngày thuộc tháng khác với sheet đang chứa nó. Bot không còn tạo ra loại này; nó
+là di sản của thời dời khoản trả sau theo kỳ sao kê.
 
 **Nguồn trả sau**:
 Thứ người dùng trả bằng mà tiền chưa rời tài khoản ngay: thẻ HSBC (`hsbc`), thẻ VPBank
-(`vpb`), SPayLater (`spl`), ví trả sau ZaloPay (`zlp`). Mỗi nguồn có ngày chốt sao kê
-riêng. Không có nguồn nghĩa là tiền rời tài khoản ngay.
-_Tránh_: "thẻ tín dụng" trống không — có hai thẻ, phải nói rõ thẻ nào. `cc` là token cũ
-của thẻ HSBC, chỉ còn sống trong tiền tố `[cc]` của các dòng đã ghi trước khi đổi.
+(`vpb`), SPayLater (`spl`), ví trả sau ZaloPay (`zlp`). Nguồn chỉ là **nhãn** cho biết
+khoản được trả bằng gì — nó không ảnh hưởng khoản nằm ở tháng nào. Không có nguồn nghĩa
+là tiền rời tài khoản ngay.
+_Tránh_: "thẻ tín dụng" trống không — có hai thẻ, phải nói rõ thẻ nào. `cc` là token đã
+nghỉ hưu của thẻ HSBC; mọi tiền tố `[cc]` trong file được đổi thành `[hsbc]`.
 
 **Hàng đợi ghi lại**:
 Nơi giữ các khoản đã nhận của người dùng nhưng chưa ghi được vào Excel. Tồn tại
