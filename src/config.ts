@@ -34,7 +34,7 @@ export const DEFERRED_SOURCES = {
 
 /**
  * Token cũ của thẻ HSBC, chỉ còn phục vụ `legacySource` (src/parse/message.ts) đọc
- * các bản ghi trong hàng đợi ghi lại / khoản mơ hồ chờ nút lưu trước khi đổi token.
+ * các khoản trong hàng đợi ghi lại / khoản mơ hồ chờ nút lưu trước khi đổi token.
  * Các dòng `[cc]` trong file đã được đổi thành `[hsbc]`; `cc` không còn là token —
  * gõ vào tin nhắn thì nó là chữ thường trong mô tả.
  */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildRow, destinationOf, type ExactEntry } from '../src/handlers/write';
-import { parseMessage } from '../src/parse/message';
+import { decodeStoredEntry, parseMessage } from '../src/parse/message';
 
 /**
  * Nối cả chuỗi quyết định lại: chữ người dùng gõ → bảng Excel nhận dòng.
@@ -29,15 +29,19 @@ describe('từ tin nhắn tới bảng đích', () => {
     expect(destination('/food ăn trưa 40k'))
       .toEqual({ table: 'food_8', sheet: 'Tháng 8', description: 'ăn trưa' }));
 
-  it('thẻ ngày 10/8 (sau ngày chốt cũ 7) → vẫn bảng tháng 8, mô tả mang [hsbc]', () =>
+  it('thẻ HSBC ngày 10/8 (sau ngày chốt cũ 7) → vẫn bảng tháng 8, mô tả mang [hsbc]', () =>
     expect(destination('/food ăn trưa 40k hsbc'))
       .toMatchObject({ table: 'food_8', description: '[hsbc] ăn trưa' }));
 
-  it('ghi lùi ngày sang tháng trước: 10/7 → bảng tháng 7, với mọi nguồn', () => {
-    expect(destination('/food ăn trưa 40k 10/7 hsbc'))
-      .toMatchObject({ table: 'food_7', description: '[hsbc] ăn trưa' });
-    expect(destination('/food ăn trưa 40k 10/7')).toMatchObject({ table: 'food_7' });
-  });
+  it.each(['hsbc', 'vpb', 'spl', 'zlp'] as const)(
+    'ghi lùi ngày sang tháng trước: 10/7 → bảng tháng 7, nguồn %s',
+    (source) => expect(destination(`/food ăn trưa 40k 10/7 ${source}`))
+      .toMatchObject({ table: 'food_7', description: `[${source}] ăn trưa` }),
+  );
+
+  it('ghi lùi ngày sang tháng trước: 10/7 → bảng tháng 7, không nguồn', () =>
+    expect(destination('/food ăn trưa 40k 10/7'))
+      .toMatchObject({ table: 'food_7', description: 'ăn trưa' }));
 
   it('nhóm khác cũng đi theo cùng quy tắc', () =>
     expect(destination('/transport grab 55k hsbc'))
@@ -54,7 +58,7 @@ describe('từ tin nhắn tới bảng đích', () => {
 describe.each([
   ['hsbc', 7], ['vpb', 26], ['spl', 24], ['zlp', 28],
 ] as const)('nguồn %s: tháng không phụ thuộc ngày chốt cũ (%i)', (source, oldCutoff) => {
-  it('trước ngày chốt cũ → bảng tháng 8, đúng tiền tố', () =>
+  it('đúng ngày chốt cũ → bảng tháng 8, đúng tiền tố', () =>
     expect(destination(`/food test 40k ${oldCutoff}/8 ${source}`))
       .toMatchObject({ table: 'food_8', description: `[${source}] test` }));
 
@@ -74,11 +78,21 @@ describe('cc cũ', () => {
 });
 
 describe('khoản trong hàng đợi / chờ nút mang targetMonth cũ', () => {
-  it('bảng đích lấy từ ngày, bỏ qua targetMonth trong payload', () => {
-    const stale = {
-      category: 'food', description: 'x', amount: 1, source: 'hsbc',
+  it('bảng đích lấy từ ngày, bỏ qua targetMonth và isCard trong payload', () => {
+    const stale = JSON.stringify({
+      category: 'food', description: 'x', amount: 1, isCard: true,
       date: { y: 2026, m: 8, d: 10 }, targetMonth: 9,
-    } as unknown as ExactEntry;
-    expect(destinationOf(stale)).toEqual({ table: 'food_8', sheet: 'Tháng 8' });
+    });
+    const entry = decodeStoredEntry<ExactEntry>(stale);
+    expect(entry).not.toHaveProperty('targetMonth');
+    expect(entry).not.toHaveProperty('isCard');
+    expect(entry.source).toBe('hsbc');
+    expect(destinationOf(entry)).toEqual({ table: 'food_8', sheet: 'Tháng 8' });
   });
+
+  it('source: "cc" cũ được đọc thành hsbc', () =>
+    expect(decodeStoredEntry<ExactEntry>(JSON.stringify({
+      category: 'food', description: 'x', amount: 1, source: 'cc',
+      date: { y: 2026, m: 8, d: 10 },
+    })).source).toBe('hsbc'));
 });

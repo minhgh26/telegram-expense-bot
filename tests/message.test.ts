@@ -86,7 +86,7 @@ describe('đánh dấu quẹt thẻ', () => {
 
   it('HỒI QUY: "nạp thẻ" KHÔNG phải khoản quẹt thẻ', () => {
     // "nạp thẻ" là câu bình thường để ghi nạp thẻ điện thoại. Nếu "thẻ" là từ
-    // khoá thì khoản này bị đẩy sang tháng sau mà không có dấu hiệu nào báo.
+    // khoá thì khoản này bị gắn nhãn nguồn trả sau mà không có dấu hiệu nào báo.
     const e = ok('/other nạp thẻ 100k');
     expect(e.source).toBe(null);
     expect(e.description).toBe('nạp thẻ');

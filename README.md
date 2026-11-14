@@ -98,8 +98,8 @@ Các token chỉ dùng cho 6 nhóm chi tiêu. Với `/income`, `/invest`, `/savi
 Chỉ nhận đúng bốn chữ `hsbc` / `vpb` / `spl` / `zlp`, **không nhận `thẻ`, `ví`, `td`** — vì
 `/other nạp thẻ 100k` là câu hoàn toàn bình thường để ghi nạp thẻ điện thoại.
 
-Ngược lại, bốn chữ đó **luôn** bị bóc khỏi mô tả và hiểu là nguồn: `/force trả nợ hsbc 5tr`
-sẽ ghi thành `[hsbc] trả nợ` như một khoản quẹt thẻ. Muốn nhắc tên ngân hàng trong mô tả
+Ngược lại, bốn chữ đó **luôn** bị bóc khỏi mô tả và hiểu là nguồn: `/force ăn tối hsbc 500k`
+sẽ ghi thành `[hsbc] ăn tối` như một khoản quẹt thẻ. Muốn nhắc tên ngân hàng trong mô tả
 thì gõ đầy đủ (`VPBank`) hoặc viết khác đi. Mã viết tắt tên `HSBC` hay `VPB` trong sheet
 `Note` cũng sẽ không bao giờ được bung.
 
@@ -163,7 +163,7 @@ tháng. Khi có file 2027, đổi `WORKBOOK_YEAR` trong `src/config.ts` và `DRI
 
 | Lệnh | Việc |
 |---|---|
-| `npm test` | 110 test đơn vị (parser, tính tổng, định dạng) |
+| `npm test` | Chạy test đơn vị (parser, tính tổng, định dạng) |
 | `npm run typecheck` | |
 | `npm run deploy` | |
 | `npm run tail` | xem log Worker thời gian thực |

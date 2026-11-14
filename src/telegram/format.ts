@@ -32,8 +32,8 @@ export function confirmation(
   ];
 
   if (e.source) {
-    const { emoji, label } = DEFERRED_SOURCES[e.source];
-    head.push(`${emoji} ${label}`);
+    const { emoji, label: sourceLabel } = DEFERRED_SOURCES[e.source];
+    head.push(`${emoji} ${sourceLabel}`);
   }
 
   const body = alignedRows([

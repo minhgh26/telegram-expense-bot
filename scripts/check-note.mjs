@@ -34,9 +34,9 @@ values.forEach((row, i) => {
 });
 
 // Vùng đọc luôn cố định ở A1 (xem url ở trên) nên chỉ số mảng trùng thẳng với
-// chỉ số cột — cột E là [4], F là [5], không cần bù trừ
-// offset như parseNote() phải làm cho một vùng bất kỳ. Bố cục cột này là bố
-// cục sheet thật, việc liệt kê thẳng ở đây là hợp lý cho một bản dump chẩn đoán.
+// chỉ số cột — cột E là [4], F là [5], không cần bù trừ offset như parseNote()
+// phải làm cho một vùng bất kỳ. Bố cục cột này là bố cục sheet thật, nên liệt kê
+// thẳng ở đây là hợp lý cho một bản dump chẩn đoán.
 const codes = {};
 for (const row of values) {
   const c = row[4];

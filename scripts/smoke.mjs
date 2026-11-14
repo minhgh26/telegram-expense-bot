@@ -93,6 +93,30 @@ const rowsEnd = await (await fetch(`${T}/rows?$select=index`, { headers: H })).j
 check('12. /undo da xoa dong', (rowsEnd.value ?? []).length === nBefore,
   `${rows.length} -> ${(rowsEnd.value ?? []).length}`);
 
+// Hai kiem tra chuyen tu verify-card.mjs (da xoa): khong lien quan toi moc chot.
+console.log('
+=== Bung ma viet tat va tu choi nguon voi thu nhap ===');
+const month = new Date(Date.now() + 7 * 3600 * 1000).getUTCMonth() + 1; // thang hien tai gio VN
+const rowsOf = async (t) =>
+  (await (await fetch(`${G}/me/drive/items/${env.TEST_ITEM_ID}/workbook/tables/${t}/rows?$select=values`,
+    { headers: H })).json()).value ?? [];
+const descs = (rows) => rows.map((x) => String(x.values?.[0]?.[0] ?? ''));
+
+// Hoi quy cho loi da tung len production. Can ma TC = TocoToco trong sheet Note cua file TEST.
+await post(message('/other TC 15k'), env.TELEGRAM_SECRET);
+await new Promise((res) => setTimeout(res, 2500));
+const otherDescs = descs(await rowsOf(`other_${month}`));
+check('13. /other TC 15k ghi mo ta "TocoToco"', otherDescs.includes('TocoToco'));
+check('14. KHONG ghi nguyen chu "TC"', !otherDescs.includes('TC'));
+await post(message('/undo'), env.TELEGRAM_SECRET);
+await new Promise((res) => setTimeout(res, 2500));
+
+const incomeBefore = (await rowsOf(`income_${month}`)).length;
+await post(message('/income luong test 20tr hsbc'), env.TELEGRAM_SECRET);
+await new Promise((res) => setTimeout(res, 2500));
+check('15. /income ... hsbc bi tu choi, khong ghi dong nao',
+  (await rowsOf(`income_${month}`)).length === incomeBefore);
+
 const failed = results.filter((x) => !x.ok);
 console.log(`\n${results.length - failed.length}/${results.length} PASS`);
 if (failed.length) { failed.forEach((f) => console.log(`  FAIL: ${f.name}`)); process.exit(1); }

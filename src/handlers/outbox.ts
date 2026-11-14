@@ -1,8 +1,7 @@
-import type { DeferredSource } from '../config';
 import { bumpOutbox, dropOutbox, dueOutbox } from '../db';
 import type { Env } from '../env';
 import { AuthExpiredError } from '../graph/auth';
-import { legacySource } from '../parse/message';
+import { decodeStoredEntry } from '../parse/message';
 import { sendMessage } from '../telegram/api';
 import { performWrite, type ExactEntry } from './write';
 
@@ -13,10 +12,7 @@ export async function drainOutbox(env: Env): Promise<void> {
   const items = await dueOutbox(env.DB, 10);
   for (const it of items) {
     try {
-      const { isCard, targetMonth: _stale, ...raw } = JSON.parse(it.payloadJson) as Omit<ExactEntry, 'source'> & {
-        source?: DeferredSource | null; isCard?: boolean; targetMonth?: number;
-      };
-      const entry: ExactEntry = { ...raw, source: legacySource({ source: raw.source, isCard }) };
+      const entry: ExactEntry = decodeStoredEntry<ExactEntry>(it.payloadJson);
       await performWrite(env, it.chatId, entry);
       await dropOutbox(env.DB, it.id);
     } catch (err) {

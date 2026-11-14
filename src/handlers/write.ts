@@ -16,8 +16,8 @@ export type ExactEntry = Omit<ParsedEntry, 'amount'> & {
 
 /**
  * Bảng và sheet nhận khoản: luôn là tháng của khoản (`date.m`), bất kể nguồn —
- * xem docs/adr/0002-khoan-nam-o-thang-tieu-khong-phai-thang-tra.md. Bản ghi cũ
- * trong hàng đợi ghi lại có thể còn mang `targetMonth`; trường đó bị bỏ qua.
+ * xem docs/adr/0002-khoan-nam-o-thang-tieu-khong-phai-thang-tra.md. Khoản cũ
+ * trong hàng đợi ghi lại có thể còn mang `targetMonth`; `decodeStoredEntry` đã bỏ nó.
  */
 export function destinationOf(e: { category: CategoryKey; date: { m: number } }):
 { table: string; sheet: string } {
