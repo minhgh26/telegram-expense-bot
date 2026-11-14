@@ -20,7 +20,7 @@ Chi tiết ở `../spec.md` mục "Công cụ dời dòng" và "Thứ tự tri�
 
 **Blocked by:** 01 — deploy trước để bot không tạo thêm khoản lệch tháng trong lúc dời; 02 — dùng chung hàm kế hoạch
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `--apply` chạy tuần tự từng dòng, đúng thứ tự thêm → vá định dạng ngày → đọc lại → xoá
 - [x] Dòng vừa dời vừa đổi mô tả: dời với mô tả mới trong một bước
@@ -31,7 +31,7 @@ Chi tiết ở `../spec.md` mục "Công cụ dời dòng" và "Thứ tự tri�
 - [x] `node scripts/audit-real.mjs` không báo công thức `Tóm tắt` hỏng
 - [x] Nghiệm thu bản TEST: người dùng mở bản TEST, đối chiếu vài dòng trong bản in của ticket 02 đã nằm đúng chỗ, không còn `[cc]`
 - [x] Người dùng đồng ý → `--apply` trên file thật (người dùng không ghi khoản trong lúc chạy)
-- [ ] Người dùng gửi `/reauth`; gửi một khoản thử và `/undo` để chắc bot ghi lại bình thường
+- [x] Người dùng gửi `/reauth`; gửi một khoản thử và `/undo` để chắc bot ghi lại bình thường
 
 ## Comments
 
@@ -121,3 +121,4 @@ Bản sửa không bao giờ gửi lại hai lệnh đó, và đọc lại đún
 - Chạy lại chế độ chỉ đọc: dời 0 · đổi mô tả tại chỗ 0 · ở yên 13. `audit-real.mjs`: công thức `Tóm tắt` đúng, không có dòng rác. Tiêu chí 6 và 7 đạt cả trên file thật.
 - Còn tiêu chí 10: người dùng gửi `/reauth` (script lại xoay token), gửi một khoản thử rồi `/undo`.
 - Bản TEST (`Theo dõi chi tiêu - TEST.xlsx`) vẫn còn trên OneDrive; xoá bằng `npm run spike:cleanup` khi không cần nữa.
+- Người dùng đã `/reauth`, gửi khoản thử rồi `/undo`: bot ghi lại bình thường (tiêu chí 10). Đủ 10/10 tiêu chí, đóng ticket.
