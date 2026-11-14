@@ -81,3 +81,42 @@ export function planSheet(group, sheetMonth, rows) {
   });
   return out;
 }
+
+/**
+ * Tìm dòng nguồn theo NỘI DUNG CŨ trong bản đọc mới (cùng quy tắc src/graph/find-row.ts:
+ * mô tả so chuỗi; ngày và số tiền so chặt theo kiểu). Nhiều dòng giống hệt → dòng dưới
+ * cùng. Không bao giờ dùng chỉ số trong kế hoạch: Graph có lúc trả bản đọc cũ (7d35edf).
+ * @returns chỉ số trong `rows`, hoặc null nếu không thấy.
+ */
+export function findOldRow(rows, oldValue) {
+  const [desc, serial, amount] = oldValue;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const row = rows[i];
+    if (!row) continue;
+    if (String(row[0] ?? '') === String(desc ?? '') && row[1] === serial && row[2] === amount) return i;
+  }
+  return null;
+}
+
+// Bản JS của src/graph/tidy-plan.ts (cùng quy tắc; sửa một bên thì sửa bên kia).
+const isEmpty = (v) => v === '' || v === null || v === undefined;
+const isBlankRow = (row) => row.slice(0, 3).every(isEmpty);
+
+/** Ngày tăng dần, dòng không ngày nằm dưới mọi dòng có ngày. */
+export function isSortedByDate(rows) {
+  let previous = -Infinity;
+  let seenUndated = false;
+  for (const row of rows) {
+    const date = row[1];
+    if (typeof date !== 'number') { seenUndated = true; continue; }
+    if (seenUndated || date < previous) return false;
+    previous = date;
+  }
+  return true;
+}
+
+/** Đáy bảng (đã sắp) chưa có dòng trống. Dọn bảng chỉ THÊM dòng, không xoá. */
+export function needsBlankRow(rows) {
+  const last = rows[rows.length - 1];
+  return !last || !isBlankRow(last);
+}

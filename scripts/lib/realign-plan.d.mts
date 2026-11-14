@@ -15,3 +15,6 @@ export interface PlanChange {
   descChanged: boolean;
 }
 export function planSheet(group: string, sheetMonth: number, rows: unknown[][]): PlanChange[];
+export function findOldRow(rows: unknown[][], oldValue: unknown[]): number | null;
+export function isSortedByDate(rows: unknown[][]): boolean;
+export function needsBlankRow(rows: unknown[][]): boolean;

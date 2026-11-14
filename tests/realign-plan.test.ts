@@ -4,6 +4,9 @@ import {
   SOURCE_TOKENS,
   SPEND_GROUPS,
   WORKBOOK_YEAR,
+  findOldRow,
+  isSortedByDate,
+  needsBlankRow,
   planSheet as plan,
   serialToDate,
 } from '../scripts/lib/realign-plan.mjs';
@@ -130,5 +133,42 @@ describe('planSheet — kế hoạch dời dòng', () => {
   it('chỉ số là vị trí dòng trong bảng', () => {
     const cs = plan('food', 9, [dong('a', 2026, 9, 1), dong('b', 2026, 8, 1)]);
     expect(cs.map((c: { index: number }) => c.index)).toEqual([1]);
+  });
+});
+
+describe('findOldRow (tìm dòng nguồn để xoá theo nội dung cũ)', () => {
+  const cu = ['[cc] ăn trưa', serial(2026, 8, 20), 40_000];
+
+  it('tìm theo nội dung, không theo chỉ số cũ', () => {
+    const rows = [['khác', serial(2026, 8, 1), 1], ['', '', ''], cu];
+    expect(findOldRow(rows, cu)).toBe(2);
+  });
+
+  it('không có dòng khớp → null', () => {
+    expect(findOldRow([['khác', serial(2026, 8, 1), 1]], cu)).toBeNull();
+    expect(findOldRow([], cu)).toBeNull();
+  });
+
+  it('nhiều dòng giống hệt → dòng dưới cùng', () => {
+    expect(findOldRow([cu, ['x', 1, 1], cu], cu)).toBe(2);
+  });
+
+  it('ngày và số tiền so chặt theo kiểu; mô tả số so như chuỗi', () => {
+    expect(findOldRow([['ăn', String(serial(2026, 8, 20)), 40_000]], ['ăn', serial(2026, 8, 20), 40_000])).toBeNull();
+    expect(findOldRow([['', '', '']], ['', 0, 0])).toBeNull();
+    expect(findOldRow([[100, serial(2026, 8, 20), 5]], ['100', serial(2026, 8, 20), 5])).toBe(0);
+  });
+});
+
+describe('needsBlankRow / isSortedByDate (bản JS của tidy-plan)', () => {
+  it('đáy chưa có dòng trống → cần', () => {
+    expect(needsBlankRow([['a', 1, 2]])).toBe(true);
+    expect(needsBlankRow([])).toBe(true);
+    expect(needsBlankRow([['a', 1, 2], ['', '', '']])).toBe(false);
+  });
+  it('đúng thứ tự: ngày tăng dần, dòng không ngày ở dưới', () => {
+    expect(isSortedByDate([['a', 1, 1], ['b', 2, 1], ['', '', '']])).toBe(true);
+    expect(isSortedByDate([['a', 2, 1], ['b', 1, 1]])).toBe(false);
+    expect(isSortedByDate([['', '', ''], ['b', 1, 1]])).toBe(false);
   });
 });
