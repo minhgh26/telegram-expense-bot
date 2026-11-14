@@ -23,7 +23,7 @@ Quy tắc phân loại ở `../spec.md` mục "Công cụ dời dòng".
 
 **Blocked by:** —
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `scripts/lib/realign-plan.mjs`: hàm thuần nhận (nhóm, tháng của sheet, các dòng) → danh sách thay đổi kèm chỉ số, giá trị cũ, giá trị mới, bảng đích, lý do, cờ ★
 - [x] Không import gì từ `src/`; hằng `WORKBOOK_YEAR`, 9 nhóm, 6 nhóm chi tiêu, bốn tiền tố khai báo lại trong file kèm comment trỏ về `src/config.ts`
@@ -33,7 +33,7 @@ Quy tắc phân loại ở `../spec.md` mục "Công cụ dời dòng".
 - [x] Bảng không tồn tại → bỏ qua, báo trong bản in
 - [x] In nhắc gửi `/reauth` ở cuối
 - [x] `npm test` và `npm run typecheck` qua
-- [ ] Nghiệm thu: chạy trên bản TEST mới tạo, người dùng đọc bản in và xác nhận danh sách hợp lý (đặc biệt các dòng ★)
+- [x] Nghiệm thu: chạy trên bản TEST mới tạo, người dùng đọc bản in và xác nhận danh sách hợp lý (đặc biệt các dòng ★)
 
 ## Comments
 
@@ -101,3 +101,9 @@ Quét chỉ đọc file thật `Theo dõi chi tiêu.xlsx` (`DRIVE_ITEM_ID`), đ�
 | saving_5 | zalopay | 14.183.548 |
 
 Lần quét này đã xoay refresh token, nên bot cần `/reauth`.
+
+### 2026-11-14 — nghiệm thu
+
+Người dùng đã chạy `node scripts/realign-months.mjs` rồi gửi `/reauth`, và xác nhận bản in hợp lý, kể cả các dòng ★. Lần chạy đọc **file thật** (`DRIVE_ITEM_ID`), không phải bản TEST mới tạo như tiêu chí ghi; người dùng đồng ý tính lần này là nghiệm thu, vì script chỉ đọc và bản in trên file thật đúng với dữ liệu ticket 03 sẽ dời. Đóng ticket.
+
+Các mặc định ở phần **For the maintainer** phía trên (dòng năm khác ở "Ở yên" và đếm một lần; từ chối mọi tham số; export `DEFERRED_ALLOWED`) vẫn chờ xác nhận.
