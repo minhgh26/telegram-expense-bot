@@ -52,3 +52,52 @@ Gate: `npx tsc --noEmit` sạch, `npx vitest run` xanh. `--apply` không có tes
 - Chưa chặn bot ghi trong lúc chạy (lệnh outbox còn xếp hàng có thể ghi + sắp xếp bảng giữa chừng): theo spec, người dùng không gửi tin ghi khoản và outbox nên rỗng trước khi chạy.
 
 **Còn lại cho người dùng:** tiêu chí 6 trở đi (chạy lại chỉ đọc, `audit-real.mjs`, `--apply` trên bản TEST, nghiệm thu, file thật, `/reauth`). Tiêu chí 6 và 7 tick theo lần chạy thật.
+
+### 2026-11-14 — /mrs:deliver: implement → review → sửa (commit 755dc11, c6d02d3, chưa push)
+
+**Cách tick tiêu chí 1–5.** Spec không cho test tự động luồng `--apply`, nên test chỉ phủ các hàm thuần
+(`findOldRow`, `isSortedByDate`, `needsBlankRow`, `shouldRetry`, `isAmbiguousFailure` trong
+`tests/realign-plan.test.ts`). Tiêu chí 1–5 được tick dựa trên đọc code: review độc lập (trục Spec) liệt kê
+từng tiêu chí là đạt, kèm dòng code. Agent báo đã chạy thử với một Graph giả trong bộ nhớ (thành công;
+DELETE trả 504; `rows/add` trả 504; bản đọc xáo thứ tự), nhưng bản giả không nằm trong repo.
+Lần chạy trên bản TEST (tiêu chí 6 và 8) mới là bằng chứng thật cho 1–5.
+
+**Review đã bắt và đã sửa ở c6d02d3:** bản đầu tự gửi lại DELETE theo chỉ số và `rows/add` khi Graph trả 5xx.
+Nếu Graph đã xoá xong mà vẫn báo lỗi, lần gửi lại sẽ xoá nhầm dòng kế bên và báo "đã dời", cùng loại với lỗi 7d35edf.
+Bản sửa không bao giờ gửi lại hai lệnh đó, và đọc lại đúng dòng (`itemAt`) trước mỗi lần xoá hoặc đổi mô tả.
+
+**Giới hạn đã biết**
+- Chưa kiểm trên Graph thật rằng `null` trong `values` khi PATCH được bỏ qua. Lần nghiệm thu TEST sẽ bắt được:
+  dòng đổi mô tả phải giữ nguyên ngày, số tiền và công thức.
+- Việc kiểm bản đọc cũ (số dòng + đọc lại `itemAt`) chỉ giảm rủi ro, không chặn tuyệt đối. Bản đọc `itemAt` cũng có thể
+  cũ trên lý thuyết. Lần chạy lại chế độ chỉ đọc (tiêu chí 6) là bước phải bắt được chuyện này.
+- Chạy chậm hơn: mỗi dòng đọc thêm, và chờ khoảng 1,5 giây khi bản đọc có vẻ cũ.
+- Ghi chú bàn giao ở trên nói "outbox nên rỗng ... theo spec". Spec (bước 4) chỉ nói người dùng không gửi tin ghi khoản,
+  không nhắc outbox.
+
+**Cố ý để nguyên (từ review)**
+- Code lặp và đặt tên chưa gọn ở chỗ không bị sửa: hai định nghĩa "dòng trống"; `ITEM`/`H` truyền đi cùng nhau; số cột và
+  `'d-mmm'` viết cứng; file script ôm nhiều việc; bản JS chép từ `tidy-plan.ts`/`find-row.ts` chưa có test đối chiếu.
+  Thời gian chờ là 1500 ms, khác 2000 ms của bot.
+- Chuỗi không dấu ở hai dòng in cũ của script.
+- Tự kiểm bảng đích đã có dòng đó chưa trước khi thêm lại: không làm, vì hai khoản giống hệt nhau là hợp lệ.
+  Thay vào đó script in cảnh báo.
+- Bước hỏi xác nhận trước khi ghi: không thêm, vì spec không đòi.
+- Chặn outbox của bot trong lúc chạy: không làm, vì ngoài phạm vi ticket (xem dưới).
+
+**Tiêu chí chưa đạt:** 6 (chạy lại chỉ đọc → mục dời và mục `[cc]` rỗng), 7 (`audit-real.mjs` sạch),
+8 (nghiệm thu bản TEST), 9 (`--apply` trên file thật), 10 (`/reauth` + khoản thử + `/undo`). Cả năm đều cần người dùng chạy thật.
+
+**Thuật ngữ thêm vào glossary:** không có.
+
+**For the maintainer**
+- Chạy trên bản TEST: `npm run spike:prepare` để `.dev.vars` trỏ vào bản TEST. Xem dòng "File đích: …" rồi mới để
+  `node scripts/realign-months.mjs --apply` chạy tiếp (không có bước hỏi, Ctrl+C nếu sai). Sau đó chạy lại không có
+  `--apply`, rồi `node scripts/audit-real.mjs`.
+- Khi nghiệm thu bản TEST, kiểm thêm: dòng ★ và dòng đổi mô tả vẫn giữ ngày, số tiền và công thức gõ tay
+  (xác nhận `null` khi PATCH).
+- Mặc định cần xác nhận: `--apply` ghi ngay sau khi in kế hoạch, không hỏi lại.
+- Mặc định cần xác nhận: khi có "Có thể trùng", phải xoá tay dòng trùng ở bảng đích trước khi chạy lại `--apply`.
+- **Needs triage** (chưa tạo ticket): cho script từ chối chạy khi outbox của bot còn khoản xếp hàng. Lý do: trong khoảng
+  1 giờ sau khi script xoay token, bot vẫn có thể ghi và sắp bảng giữa chừng. Có làm không, hay chỉ cần dặn
+  "kiểm outbox rỗng trước khi chạy"?
