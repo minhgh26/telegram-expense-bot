@@ -94,8 +94,7 @@ check('12. /undo da xoa dong', (rowsEnd.value ?? []).length === nBefore,
   `${rows.length} -> ${(rowsEnd.value ?? []).length}`);
 
 // Hai kiem tra chuyen tu verify-card.mjs (da xoa): khong lien quan toi moc chot.
-console.log('
-=== Bung ma viet tat va tu choi nguon voi thu nhap ===');
+console.log('\n=== Bung ma viet tat va tu choi nguon voi thu nhap ===');
 const month = new Date(Date.now() + 7 * 3600 * 1000).getUTCMonth() + 1; // thang hien tai gio VN
 const rowsOf = async (t) =>
   (await (await fetch(`${G}/me/drive/items/${env.TEST_ITEM_ID}/workbook/tables/${t}/rows?$select=values`,

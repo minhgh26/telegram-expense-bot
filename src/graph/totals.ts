@@ -7,7 +7,7 @@ export interface Totals {
   categoryMonth: number;
   /** Tổng chi của `daySerial` (không gồm thu nhập / đầu tư / tiết kiệm) */
   today: number;
-  /** Tổng chi cả tháng này */
+  /** Tổng chi cả tháng của khoản */
   monthSpend: number;
 }
 
