@@ -1,7 +1,6 @@
-import type { DeferredSource } from '../config';
 import { putPending, takePending } from '../db';
 import type { Env } from '../env';
-import { legacySource, type ParsedEntry } from '../parse/message';
+import { decodeStoredEntry, type ParsedEntry } from '../parse/message';
 import { answerCallback, sendMessage } from '../telegram/api';
 import { formatVND } from '../telegram/format';
 import { performWrite, type ExactEntry } from './write';
@@ -12,11 +11,11 @@ import { performWrite, type ExactEntry } from './write';
  */
 export async function askAmount(
   env: Env, chatId: number, entry: ParsedEntry,
-  targetMonth: number, low: number, high: number,
+  low: number, high: number,
 ): Promise<void> {
   const id = crypto.randomUUID().slice(0, 8);
   await putPending(env.DB, {
-    id, chatId, payloadJson: JSON.stringify({ ...entry, targetMonth, low, high }),
+    id, chatId, payloadJson: JSON.stringify({ ...entry, low, high }),
   });
 
   await sendMessage(
@@ -43,14 +42,10 @@ export async function resolveAmount(
     return;
   }
 
-  const p = JSON.parse(pending.payloadJson) as Omit<ParsedEntry, 'source'> & {
-    low: number; high: number; targetMonth: number;
-    source?: DeferredSource | null; isCard?: boolean;
-  };
+  const p = decodeStoredEntry<ParsedEntry & { low: number; high: number }>(pending.payloadJson);
   const exact: ExactEntry = {
     category: p.category, description: p.description, date: p.date,
-    source: legacySource(p),
-    targetMonth: p.targetMonth,
+    source: p.source,
     amount: which === 'hi' ? p.high : p.low,
   };
 

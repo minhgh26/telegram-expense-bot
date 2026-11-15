@@ -12,7 +12,7 @@ I can't review TypeScript. Ask at the black-box level: the Telegram message that
 
 ### Issue tracker
 
-Issues live as markdown files under `.scratch/<feature>/` in this repo. See `docs/agents/issue-tracker.md`.
+Issues and specs live in this repo's GitHub Issues, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
@@ -20,4 +20,4 @@ The five canonical roles, each label string equal to its name. See `docs/agents/
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.

@@ -3,21 +3,19 @@ import {
 } from './sheet';
 
 export interface Totals {
-  /** Tổng nhóm vừa ghi, trong tháng ĐÍCH */
+  /** Tổng nhóm vừa ghi, trong tháng của khoản */
   categoryMonth: number;
   /** Tổng chi của `daySerial` (không gồm thu nhập / đầu tư / tiết kiệm) */
   today: number;
-  /** Tổng chi cả tháng ĐÍCH */
+  /** Tổng chi cả tháng của khoản */
   monthSpend: number;
 }
 
 const TOTAL_LABEL = 'Tổng chi';
 
 /**
- * Tổng chi của một ngày trên MỘT sheet.
- *
- * Tách riêng vì khoản quẹt thẻ nhảy tháng nằm ở sheet tháng thanh toán, còn chi
- * tiền mặt cùng ngày nằm ở sheet tháng phát sinh — phải cộng cả hai mới đúng.
+ * Tổng chi của một ngày trên sheet đã đọc: cộng số tiền của mọi dòng trong các
+ * khối chi tiêu (không gồm thu nhập / đầu tư / tiết kiệm) có ngày bằng `daySerial`.
  */
 export function sumDay(sheet: SheetData, daySerial: number): number {
   const off = colOffset(sheet.address);

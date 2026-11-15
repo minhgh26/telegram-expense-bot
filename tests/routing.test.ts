@@ -1,156 +1,98 @@
 import { describe, expect, it } from 'vitest';
-import { paymentMonth } from '../src/billing';
-import { cutoffDayFor, tableName } from '../src/config';
-import { buildRow, type ExactEntry } from '../src/handlers/write';
-import { parseMessage } from '../src/parse/message';
+import { buildRow, destinationOf, type ExactEntry } from '../src/handlers/write';
+import { decodeStoredEntry, parseMessage } from '../src/parse/message';
 
 /**
  * Nối cả chuỗi quyết định lại: chữ người dùng gõ → bảng Excel nhận dòng.
  *
- * Từng mắt xích đã có test riêng, nhưng chỗ chúng ghép vào nhau thì chưa —
- * mà đó mới là lời hứa của tính năng. Cả chuỗi đều là hàm thuần nên kiểm được
- * mà không cần dựng Env hay giả lập Graph.
+ * Mọi khoản nằm ở sheet của tháng của khoản (tháng của ngày tiêu), bất kể nguồn
+ * — xem docs/adr/0002-khoan-nam-o-thang-tieu-khong-phai-thang-tra.md. Cả chuỗi
+ * là hàm thuần nên kiểm được mà không cần dựng Env hay giả lập Graph.
  */
 const NOW = Date.UTC(2026, 7, 10, 5, 0); // 12:00 ngày 10/08/2026 giờ VN
 
-interface Destination { table: string; description: string }
+interface Destination { table: string; sheet: string; description: string }
 
-// Ô mô tả đọc qua `buildRow` — tức chính hàm hàng ghi thật gọi — chứ không đọc
-// thẳng `parsed.entry.description`, để ticket 02 ghép tiền tố ở đó thì seam
-// này bắt được thay đổi thay vì chỉ quan sát mỗi bước phân tích.
-//
-// `cutoffOverride` mô phỏng trường hợp sheet Note không có mốc riêng cho
-// nguồn đã gõ: router.ts thật luôn truyền `note.cutoffDays` cho `cutoffDayFor`
-// (xem test riêng bên dưới), ở đây bỏ trống tham số thứ hai để lấy đúng mặc
-// định trong code; truyền `cutoffOverride` vào thì dùng để kiểm công thức
-// tổng quát (mốc nào cũng ra cùng một kết quả, chỉ số khác nhau).
-const destination = (text: string, cutoffOverride?: number): Destination => {
+// Ô mô tả đọc qua `buildRow` — chính hàm hàng ghi thật gọi — và bảng đích qua
+// `destinationOf` — chính hàm `performWrite` gọi.
+const destination = (text: string): Destination => {
   const parsed = parseMessage(text, NOW, {});
   if (!parsed.ok) throw new Error(`không phân tích được: ${parsed.error}`);
   if (parsed.entry.amount.kind !== 'exact') throw new Error('seam này không xử lý số tiền mơ hồ');
-  const cutoffDay = cutoffOverride ?? cutoffDayFor(parsed.entry.source);
-  const target = paymentMonth(parsed.entry.date, parsed.entry.source, cutoffDay);
-  if (!target.ok) throw new Error(`bị từ chối: ${target.error}`);
-
-  const exact: ExactEntry = {
-    ...parsed.entry, amount: parsed.entry.amount.amount, targetMonth: target.month,
-  };
+  const exact: ExactEntry = { ...parsed.entry, amount: parsed.entry.amount.amount };
   const [description] = buildRow(exact);
-  return { table: tableName(parsed.entry.category, target.month), description };
+  return { ...destinationOf(exact), description: String(description) };
 };
 
 describe('từ tin nhắn tới bảng đích', () => {
   it('tiền mặt ngày 10/8 → bảng tháng 8', () =>
-    expect(destination('/food ăn trưa 40k')).toEqual({ table: 'food_8', description: 'ăn trưa' }));
+    expect(destination('/food ăn trưa 40k'))
+      .toEqual({ table: 'food_8', sheet: 'Tháng 8', description: 'ăn trưa' }));
 
-  it('quẹt thẻ ngày 10/8 → bảng tháng 9, mô tả mang tiền tố [hsbc]', () =>
-    expect(destination('/food ăn trưa 40k hsbc')).toEqual({ table: 'food_9', description: '[hsbc] ăn trưa' }));
+  it('thẻ HSBC ngày 10/8 (sau ngày chốt cũ 7) → vẫn bảng tháng 8, mô tả mang [hsbc]', () =>
+    expect(destination('/food ăn trưa 40k hsbc'))
+      .toMatchObject({ table: 'food_8', description: '[hsbc] ăn trưa' }));
 
-  it('quẹt thẻ ngày 3/8 chưa qua mốc → vẫn bảng tháng 8', () =>
-    expect(destination('/food ăn trưa 40k 3/8 hsbc')).toEqual({ table: 'food_8', description: '[hsbc] ăn trưa' }));
+  it.each(['hsbc', 'vpb', 'spl', 'zlp'] as const)(
+    'ghi lùi ngày sang tháng trước: 10/7 → bảng tháng 7, nguồn %s',
+    (source) => expect(destination(`/food ăn trưa 40k 10/7 ${source}`))
+      .toMatchObject({ table: 'food_7', description: `[${source}] ăn trưa` }),
+  );
 
-  it('quẹt thẻ đúng ngày mốc 7/8 → vẫn bảng tháng 8', () =>
-    expect(destination('/food ăn trưa 40k 7/8 hsbc')).toEqual({ table: 'food_8', description: '[hsbc] ăn trưa' }));
-
-  it('ghi lùi sang tháng trước: quẹt thẻ 10/7 → bảng tháng 8', () =>
-    // Ngày 10/7 đã qua mốc của kỳ sao kê 7/7, nên rơi vào kỳ 7/8 và trả trong
-    // tháng 8. Ghi lùi ngày và quy tắc thẻ tự khớp, không cần luật riêng.
-    expect(destination('/food ăn trưa 40k 10/7 hsbc')).toEqual({ table: 'food_8', description: '[hsbc] ăn trưa' }));
-
-  it('mốc chốt 4 đẩy ngày 5/8 sang bảng tháng 9', () =>
-    expect(destination('/food ăn trưa 40k 5/8 hsbc', 4)).toEqual({ table: 'food_9', description: '[hsbc] ăn trưa' }));
-
-  it('cùng ngày 5/8 với mốc 7 thì ở lại bảng tháng 8', () =>
-    expect(destination('/food ăn trưa 40k 5/8 hsbc', 7)).toEqual({ table: 'food_8', description: '[hsbc] ăn trưa' }));
+  it('ghi lùi ngày sang tháng trước: 10/7 → bảng tháng 7, không nguồn', () =>
+    expect(destination('/food ăn trưa 40k 10/7'))
+      .toMatchObject({ table: 'food_7', description: 'ăn trưa' }));
 
   it('nhóm khác cũng đi theo cùng quy tắc', () =>
-    expect(destination('/transport grab 55k hsbc')).toEqual({ table: 'transport_9', description: '[hsbc] grab' }));
-
-  it('tiền mặt không bao giờ nhảy tháng, kể cả cuối tháng', () =>
-    expect(destination('/other lặt vặt 30k 28/8')).toEqual({ table: 'other_8', description: 'lặt vặt' }));
-
-  it('ô mô tả bằng đúng chữ người dùng gõ khi không có nguồn — không tiền tố', () =>
-    expect(destination('/food ăn trưa 40k').description).toBe('ăn trưa'));
+    expect(destination('/transport grab 55k hsbc'))
+      .toMatchObject({ table: 'transport_8', description: '[hsbc] grab' }));
 
   it('token nguồn đứng ở vị trí nào trong câu cũng cho cùng kết quả', () => {
-    expect(destination('/food hsbc ăn trưa 40k')).toEqual({ table: 'food_9', description: '[hsbc] ăn trưa' });
-    expect(destination('/food ăn hsbc trưa 40k')).toEqual({ table: 'food_9', description: '[hsbc] ăn trưa' });
+    expect(destination('/food hsbc ăn trưa 40k'))
+      .toMatchObject({ table: 'food_8', description: '[hsbc] ăn trưa' });
+    expect(destination('/food ăn hsbc trưa 40k'))
+      .toMatchObject({ table: 'food_8', description: '[hsbc] ăn trưa' });
   });
 });
 
-describe('spl và zlp chạy đúng như hsbc, chỉ khác mốc chốt và tiền tố', () => {
-  it('spl (mốc 24): ngày 20/8 chưa qua mốc → bảng tháng 8, tiền tố [spl]', () =>
-    expect(destination('/food mua áo 250k 20/8 spl'))
-      .toEqual({ table: 'food_8', description: '[spl] mua áo' }));
+describe.each([
+  ['hsbc', 7], ['vpb', 26], ['spl', 24], ['zlp', 28],
+] as const)('nguồn %s: tháng không phụ thuộc ngày chốt cũ (%i)', (source, oldCutoff) => {
+  it('đúng ngày chốt cũ → bảng tháng 8, đúng tiền tố', () =>
+    expect(destination(`/food test 40k ${oldCutoff}/8 ${source}`))
+      .toMatchObject({ table: 'food_8', description: `[${source}] test` }));
 
-  it('spl: ngày 25/8 qua mốc 24 → bảng tháng 9', () =>
-    expect(destination('/food mua áo 250k 25/8 spl'))
-      .toEqual({ table: 'food_9', description: '[spl] mua áo' }));
+  it('sau ngày chốt cũ → vẫn bảng tháng 8', () =>
+    expect(destination(`/food test 40k ${oldCutoff + 1}/8 ${source}`))
+      .toMatchObject({ table: 'food_8', description: `[${source}] test` }));
 
-  it('spl: đúng ngày mốc 24/8 vẫn ở bảng tháng 8', () =>
-    expect(destination('/food mua áo 250k 24/8 spl'))
-      .toEqual({ table: 'food_8', description: '[spl] mua áo' }));
+  it('cuối tháng 12 sau ngày chốt cũ → bảng tháng 12, không bị từ chối', () =>
+    expect(destination(`/food test 40k ${oldCutoff + 1}/12 ${source}`))
+      .toMatchObject({ table: 'food_12', sheet: 'Tháng 12', description: `[${source}] test` }));
+});
 
-  it('spl: ghi lùi ngày vẫn áp mốc của spl (25/7 qua mốc kỳ 24/7 → trả tháng 8)', () =>
-    expect(destination('/food mua áo 250k 25/7 spl'))
-      .toEqual({ table: 'food_8', description: '[spl] mua áo' }));
-
-  it('vpb (mốc 26): ngày 25/8 chưa qua mốc → bảng tháng 8, tiền tố [vpb]', () =>
-    expect(destination('/food mua sách 120k 25/8 vpb'))
-      .toEqual({ table: 'food_8', description: '[vpb] mua sách' }));
-
-  it('vpb: đúng ngày mốc 26/8 vẫn ở bảng tháng 8', () =>
-    expect(destination('/food mua sách 120k 26/8 vpb'))
-      .toEqual({ table: 'food_8', description: '[vpb] mua sách' }));
-
-  it('vpb: ngày 27/8 qua mốc 26 → bảng tháng 9', () =>
-    expect(destination('/food mua sách 120k 27/8 vpb'))
-      .toEqual({ table: 'food_9', description: '[vpb] mua sách' }));
-
-  it('vpb 27/12 (qua mốc 26) → từ chối', () =>
-    expect(() => destination('/food mua sách 120k 27/12 vpb')).toThrow(/1\/2027/));
-
-  it('cc cũ giờ là chữ thường: ngày 10/8 ở lại bảng tháng 8, không tiền tố', () =>
+describe('cc cũ', () => {
+  it('giờ là chữ thường: ngày 10/8 ở bảng tháng 8, không tiền tố', () =>
     expect(destination('/food ăn trưa 40k cc'))
-      .toEqual({ table: 'food_8', description: 'ăn trưa cc' }));
+      .toMatchObject({ table: 'food_8', description: 'ăn trưa cc' }));
+});
 
-  it('zlp (mốc 28): ngày 20/8 chưa qua mốc → bảng tháng 8, tiền tố [zlp]', () =>
-    expect(destination('/food trả góp 300k 20/8 zlp'))
-      .toEqual({ table: 'food_8', description: '[zlp] trả góp' }));
-
-  it('zlp: ngày 29/8 qua mốc 28 → bảng tháng 9', () =>
-    expect(destination('/food trả góp 300k 29/8 zlp'))
-      .toEqual({ table: 'food_9', description: '[zlp] trả góp' }));
-
-  it('zlp: đúng ngày mốc 28/8 vẫn ở bảng tháng 8', () =>
-    expect(destination('/food trả góp 300k 28/8 zlp'))
-      .toEqual({ table: 'food_8', description: '[zlp] trả góp' }));
-
-  it('cùng ngày 5/8 (trước mọi mốc): hsbc, spl, zlp đều ở lại bảng tháng 8', () => {
-    expect(destination('/food test 40k 5/8 hsbc').table).toBe('food_8');
-    expect(destination('/food test 40k 5/8 spl').table).toBe('food_8');
-    expect(destination('/food test 40k 5/8 zlp').table).toBe('food_8');
+describe('khoản trong hàng đợi / chờ nút mang targetMonth cũ', () => {
+  it('bảng đích lấy từ ngày, bỏ qua targetMonth và isCard trong payload', () => {
+    const stale = JSON.stringify({
+      category: 'food', description: 'x', amount: 1, isCard: true,
+      date: { y: 2026, m: 8, d: 10 }, targetMonth: 9,
+    });
+    const entry = decodeStoredEntry<ExactEntry>(stale);
+    expect(entry).not.toHaveProperty('targetMonth');
+    expect(entry).not.toHaveProperty('isCard');
+    expect(entry.source).toBe('hsbc');
+    expect(destinationOf(entry)).toEqual({ table: 'food_8', sheet: 'Tháng 8' });
   });
-});
 
-describe('khoản trả sau vắt sang năm sau bị chặn ngay ở chuỗi này, cho mọi nguồn', () => {
-  it('quẹt thẻ 10/12 → từ chối, không có bảng nào nhận', () =>
-    expect(() => destination('/food ăn trưa 40k 10/12 hsbc')).toThrow(/1\/2027/));
-
-  it('spl 25/12 (qua mốc 24) → từ chối', () =>
-    expect(() => destination('/food mua áo 250k 25/12 spl')).toThrow(/1\/2027/));
-
-  it('zlp 29/12 (qua mốc 28) → từ chối', () =>
-    expect(() => destination('/food trả góp 300k 29/12 zlp')).toThrow(/1\/2027/));
-
-  it('tiền mặt 10/12 vẫn ghi bình thường', () =>
-    expect(destination('/food ăn trưa 40k 10/12')).toEqual({ table: 'food_12', description: 'ăn trưa' }));
-});
-
-describe('cutoffDayFor: đúng lời gọi router.ts thật dùng để đưa mốc từ Note vào', () => {
-  it('mốc từ note.cutoffDays đè mốc mặc định trong code', () =>
-    expect(cutoffDayFor('hsbc', { hsbc: 20, vpb: 26, spl: 24, zlp: 28 })).toBe(20));
-
-  it('không có nguồn → 0, bất kể cutoffDays truyền vào là gì', () =>
-    expect(cutoffDayFor(null, { hsbc: 20, vpb: 26, spl: 24, zlp: 28 })).toBe(0));
+  it('source: "cc" cũ được đọc thành hsbc', () =>
+    expect(decodeStoredEntry<ExactEntry>(JSON.stringify({
+      category: 'food', description: 'x', amount: 1, source: 'cc',
+      date: { y: 2026, m: 8, d: 10 },
+    })).source).toBe('hsbc'));
 });

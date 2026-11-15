@@ -24,6 +24,22 @@ DeferredSource | null {
   if (p.source === LEGACY_HSBC_TOKEN || (p.source == null && p.isCard)) return 'hsbc';
   return p.source != null && isDeferredSource(p.source) ? p.source : null;
 }
+
+/**
+ * Đọc một khoản đã lưu dạng JSON (hàng đợi ghi lại, khoản mơ hồ chờ nút): chuẩn hoá
+ * `source` qua `legacySource` và BỎ `isCard` / `targetMonth` cũ. Bảng đích luôn suy ra
+ * từ `date.m` (ADR-0002), nên `targetMonth` không được lọt ra khỏi đây. Các trường
+ * còn lại (amount, low, high...) giữ nguyên. Xoá được cùng `legacySource`.
+ */
+export function decodeStoredEntry<T extends { source: DeferredSource | null }>(json: string):
+Omit<T, 'source'> & { source: DeferredSource | null } {
+  const { isCard, targetMonth: _stale, ...raw } = JSON.parse(json) as Omit<T, 'source'> & {
+    source?: string | null; isCard?: boolean; targetMonth?: number;
+  };
+  return { ...raw, source: legacySource({ source: raw.source, isCard }) } as
+    Omit<T, 'source'> & { source: DeferredSource | null };
+}
+
 export type ParseOutcome =
   | { ok: true; entry: ParsedEntry }
   | { ok: false; error: string };
@@ -36,7 +52,7 @@ const MULTIWORD: [RegExp, string][] = [
 ];
 
 /** Thu nhập, đầu tư, tiết kiệm không đến từ nguồn trả sau. */
-const DEFERRED_ALLOWED = new Set<CategoryKey>([
+export const DEFERRED_ALLOWED = new Set<CategoryKey>([
   'food', 'eat_out', 'transport', 'force', 'other', 'other_expense',
 ]);
 

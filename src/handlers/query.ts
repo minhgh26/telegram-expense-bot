@@ -12,27 +12,19 @@ export async function handleToday(env: Env, chatId: number): Promise<void> {
   const today = vnToday(Date.now());
   const serial = toExcelSerial(today);
 
-  // Khoản quẹt thẻ hôm nay đã nằm ở sheet tháng sau nếu hôm nay qua mốc chốt.
-  // Đọc cả hai rồi lọc theo ngày — không cần biết mốc chốt là bao nhiêu.
-  const [cur, next] = await Promise.all([
-    readSheet(env, sheetName(today.m)),
-    today.m < 12 ? readSheet(env, sheetName(today.m + 1)) : Promise.resolve(null),
-  ]);
+  const cur = await readSheet(env, sheetName(today.m));
 
   const items: [string, string][] = [];
   let total = 0;
-  for (const data of [cur, next]) {
-    if (!data) continue;
-    const off = colOffset(data.address);
-    for (const row of data.values) {
-      for (const c of SPEND_BLOCKS) {
-        const desc = text(cellAt(row, c, off));
-        const d = num(cellAt(row, c + 1, off));
-        const amt = num(cellAt(row, c + 2, off));
-        if (d === serial && amt !== null && desc) {
-          items.push([desc.slice(0, 22), formatVND(amt)]);
-          total += amt;
-        }
+  const off = colOffset(cur.address);
+  for (const row of cur.values) {
+    for (const c of SPEND_BLOCKS) {
+      const desc = text(cellAt(row, c, off));
+      const d = num(cellAt(row, c + 1, off));
+      const amt = num(cellAt(row, c + 2, off));
+      if (d === serial && amt !== null && desc) {
+        items.push([desc.slice(0, 22), formatVND(amt)]);
+        total += amt;
       }
     }
   }
@@ -63,8 +55,7 @@ export async function handleMonth(env: Env, chatId: number): Promise<void> {
     if (wanted.has(label)) rows.push([label, formatVND(v)]);
   }
 
-  // Nghĩa đã đổi từ khi có tính năng thẻ: đây là tiền RỜI TÀI KHOẢN trong tháng,
-  // không phải tiền tiêu trong tháng.
+  // Tổng ĐÃ TIÊU trong tháng này (khoản nằm ở sheet của tháng tiêu, ADR-0002).
   await sendMessage(
     env, chatId,
     `<b>Tháng ${today.m}</b>\n<pre>${alignedRows(rows)}</pre>\n` +
