@@ -105,7 +105,7 @@ export function reauthCodeFailed(error: string): string {
  * Trả refresh token mới ra chat để chép tay vào .dev.vars.
  *
  * D1 của Worker và .dev.vars là hai người giữ trên cùng một chuỗi token
- * (xem CONTEXT.md), nên bên nào dùng trước là bên kia chết. Dòng cảnh báo cuối
+ * (xem GLOSSARY.md), nên bên nào dùng trước là bên kia chết. Dòng cảnh báo cuối
  * là cái giá đã biết và đã chọn của cách làm này.
  */
 export function reauthDone(refreshToken: string): string {

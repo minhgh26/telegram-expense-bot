@@ -30,7 +30,7 @@ export function serialToDate(serial) {
 const CC_PREFIX = '[cc] ';
 const HSBC_PREFIX = '[hsbc] ';
 
-// "Dòng trống" = 3 ô mô tả, ngày, số tiền (CONTEXT.md; cùng nghĩa với tidy-plan.ts).
+// "Dòng trống" = 3 ô mô tả, ngày, số tiền (GLOSSARY.md; cùng nghĩa với tidy-plan.ts).
 const isBlank = (row) => row.slice(0, 3).every((c) => c === '' || c == null);
 const hasSource = (desc) => SOURCE_TOKENS.some((t) => desc.startsWith(`[${t}] `));
 
@@ -123,7 +123,7 @@ export function needsBlankRow(rows) {
 
 /**
  * Có gửi lại yêu cầu HTTP không. 429 = Graph chưa làm gì → luôn gửi lại được. 5xx có thể là
- * "đã áp dụng nhưng trả lời lỗi" (xem .scratch/ghi-trung): chỉ gửi lại lệnh LẶP ĐƯỢC (đọc,
+ * "đã áp dụng nhưng trả lời lỗi" (xem issue #19): chỉ gửi lại lệnh LẶP ĐƯỢC (đọc,
  * PATCH giá trị cố định, sắp). DELETE theo chỉ số và rows/add thì KHÔNG: gửi lại là xoá nhầm
  * dòng kế bên hoặc thêm bản thứ hai.
  */

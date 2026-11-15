@@ -42,7 +42,7 @@ export const LEGACY_HSBC_TOKEN = 'cc';
 
 /**
  * `null` (không phải thành viên của kiểu này) nghĩa là tiền rời tài khoản
- * ngay — xem CONTEXT.md, mục "Nguồn trả sau".
+ * ngay — xem GLOSSARY.md, mục "Nguồn trả sau".
  */
 export type DeferredSource = keyof typeof DEFERRED_SOURCES;
 

@@ -22,7 +22,7 @@ lấy `MS_CLIENT_ID`, deploy xong quay lại **Authentication** thêm redirect U
 
 App là **public client thật** — không tạo client secret, không có gì để hết hạn. Redirect URI
 phải đăng ký đúng nền tảng **"Mobile and desktop applications"**, KHÔNG phải "Web": nền tảng
-quyết định loại client, không phải công tắc "Allow public client flows" (xem `CONTEXT.md`).
+quyết định loại client, không phải công tắc "Allow public client flows" (xem `GLOSSARY.md`).
 
 Sau khi tạo:
 
@@ -100,7 +100,7 @@ báo `🔑 Hết hiệu lực xác thực` (refresh token đã chết). Không c
 Link sống 15 phút. Quá hạn thì gửi `/reauth` lấy link khác.
 
 **Chép refresh token bot in ra vào `.dev.vars`.** D1 của Worker và `.dev.vars` là hai
-người giữ trên **cùng một chuỗi token** (xem `CONTEXT.md`) — bên nào đem token đi đổi
+người giữ trên **cùng một chuỗi token** (xem `GLOSSARY.md`) — bên nào đem token đi đổi
 trước thì bên kia chết ngay.
 
 | Việc vừa làm              | Hậu quả                                       |
@@ -151,4 +151,4 @@ npx wrangler d1 migrations apply expense-bot --remote
 
 `0003_pending_auth.sql` giữ `code_verifier` + `state` (PKCE) giữa lúc gửi `/reauth` và lúc
 Microsoft redirect về `/oauth/callback` — thay cho `0002_pending_device_code.sql` (device code,
-đã bỏ, xem ticket 06 ở `.scratch/reauth-token-chet/`).
+đã bỏ, xem issue #11).

@@ -40,7 +40,7 @@ Chuỗi refresh token cấp ra bình thường, không ai thu hồi, kho token k
 client secret nào hết hạn (app là public client thật) — nhưng CHÍNH chuỗi đó chưa bao giờ
 đổi được (`invalid_grant` mỗi lần gọi `exchangeRefreshToken`, dù access token cùng lô vẫn gọi
 Graph 200 bình thường trong một giờ). Đo được với chuỗi do device code sinh ra cho tài khoản
-Microsoft cá nhân này (ticket 06 ở `.scratch/reauth-token-chet/`) — không đổi lại được bất kể
+Microsoft cá nhân này (issue #11) — không đổi lại được bất kể
 Worker/vị trí, tốc độ lan truyền cấu hình Azure, hay độ trễ giữa lúc cấp và lúc đổi thử.
 _Dấu vân tay_: access token gọi Graph vẫn 200 trong khi refresh token cùng grant đó trả
 `invalid_grant` — khác bốn nguyên nhân kia (thu hồi quyền, token đã dùng mất, secret hết hạn,

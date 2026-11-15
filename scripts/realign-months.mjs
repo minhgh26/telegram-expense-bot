@@ -120,7 +120,7 @@ const tableUrl = (ITEM, t) => `${ITEM}/workbook/tables/${encodeURIComponent(t)}`
 /**
  * Gọi Graph. 429 gửi lại; 5xx chỉ gửi lại lệnh lặp được (GET, PATCH, hoặc `idempotent: true`).
  * DELETE theo chỉ số và rows/add KHÔNG bao giờ gửi lại khi 5xx: có thể Graph đã áp dụng rồi
- * (.scratch/ghi-trung), gửi lại là xoá nhầm dòng kế bên hoặc thêm bản thứ hai.
+ * (issue #19), gửi lại là xoá nhầm dòng kế bên hoặc thêm bản thứ hai.
  * Ném Error có `.status` khi lỗi HTTP; lỗi mạng ném không có `.status` (xem isAmbiguousFailure).
  */
 async function graph(H, url, { idempotent, ...init } = {}) {
